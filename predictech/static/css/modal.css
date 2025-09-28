@@ -1,0 +1,392 @@
+/*--- MODAL-CONFIRM ---*/
+.modal-confirm {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(0, 0, 0, 0.85);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity .25s ease-in-out;
+    z-index: 150;
+}
+
+
+
+.modal-confirm--active {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.modal-confirm-container {
+    max-width: 500px;
+    width: 100%;
+    margin: 0 auto;
+}
+
+.modal-confirm-content {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 500px;
+    background-color: var(--bs-body-bg);
+    box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+    border: 1px solid var(--bg-border);
+    border-radius: 12px 12px;
+    box-sizing: border-box;
+    padding: 24px 24px;
+}
+
+.modal-confirm-header {
+    display: flex;
+    justify-content: space-between;
+    margin: 0 0 30px 0;
+}
+
+.modal-confirm-header--risk {
+    margin: 0 0 16px 0;
+}
+
+.modal-confirm-header__text {
+    font-size: 18px;
+    color: #111827;
+}
+
+.modal-confirm-header__close {
+    cursor: pointer;
+}
+
+.modal-confirm-content__title {
+    font-size: 22px;
+    width: 300px;
+    text-align: center;
+    margin: 0 auto;
+    margin-bottom: 16px;
+}
+
+.signature-block {
+    border: 1px solid var(--bg-border);
+    box-sizing: border-box;
+    padding: 16px 16px;
+    line-height: 1.5;
+    color: #1f2937;
+    border-radius: 8px 8px;
+    margin: 0 0 16px 0;
+}
+
+.signature-label {
+    margin: 0 0 12px 0;
+    position: relative;
+    box-sizing: border-box;
+    padding: 0 0 0 26px;
+    color: #1f2937;
+}
+
+.signature-label::before {
+    position: absolute;
+    content: '';
+    top: 4px;
+    left: 0px;
+    width: 20px;
+    height: 16px;
+    background-image: url(../img/icon/podpis.svg);
+    background-repeat: no-repeat;
+    background-size: contain;
+}
+
+.signature-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    background-color: #3b82f6;
+    transition: background .25s ease-in-out;
+}
+
+.signature-btn:hover {
+    background: color-mix(in srgb, #3b82f6 90%, black);
+}
+
+.modal-confirm-content .btn-prymary {
+    font-weight: 400;
+    font-size: 16px;
+}
+
+.signature-btn__img {
+    margin: 0 6px 0 0;
+}
+
+.qr-auth-text {
+    margin: 0 0 12px 0;
+    position: relative;
+    box-sizing: border-box;
+    padding: 0 0 0 20px;
+    color: #1f2937;
+
+    &::before {
+        position: absolute;
+        content: '';
+        top: 4px;
+        left: 0px;
+        width: 20px;
+        height: 16px;
+        background-image: url(../img/icon/qr.svg);
+        background-repeat: no-repeat;
+        background-size: contain;
+    }
+}
+
+.wrapper-qr-auth-instruction__img {
+    display: block;
+    margin: 0 auto;
+    margin-bottom: 8px;
+}
+
+.wrapper-qr-auth-instruction {
+    background: #f3f4f6;
+    border-radius: 8px 8px;
+    box-sizing: border-box;
+    padding: 16px 16px;
+}
+
+.qr-auth-instruction {
+    font-size: 14px;
+    line-height: 143%;
+    text-align: center;
+    color: #3b82f6;
+}
+
+.biometry-title {
+    margin: 0 0 12px 0;
+    position: relative;
+    box-sizing: border-box;
+    padding: 0 0 0 26px;
+    color: #1f2937;
+
+    &::before {
+        position: absolute;
+        content: '';
+        top: 4px;
+        left: 0px;
+        width: 20px;
+        height: 16px;
+        background-image: url(../img/icon/scan.svg);
+        background-repeat: no-repeat;
+        background-size: contain;
+    }
+}
+
+.scan-button {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    background: #3b82f6;
+    transition: background .25s ease-in-out;
+}
+
+.scan-button:hover {
+    background: color-mix(in srgb, #3b82f6 90%, black);
+}
+
+.scan-button__img {
+    margin: 0 6px 0 0;
+}
+
+/*--- MODAL-CONFIRM ---*/
+
+/*--- MODAL-RISK ---*/
+.training-info {
+    margin: 0 0 16px 0;
+}
+
+.training-date,
+.model-accuracy,
+.accuracy-improvement {
+    font-size: 12px;
+    line-height: 133%;
+    color: #4b5563;
+}
+
+.title-risk {
+    font-size: 14px;
+    line-height: 143%;
+    color: rgba(0, 32, 51, 0.6);
+    margin: 0 0 20px 0;
+}
+
+.risk-setting {
+    display: flex;
+    align-items: center;
+}
+
+.risk-setting:not(:last-child) {
+    margin: 0 0 18px 0;
+}
+
+.risk-input {
+    width: 100px;
+    height: 32px;
+    box-sizing: border-box;
+    padding: 8px 8px;
+    font-size: 12px;
+    margin: 0 6px 0 0;
+    border: 1px solid var(--bg-border);
+    border-radius: 4px 4px;
+    outline-color: rgba(37, 100, 235, 0.431372549);
+}
+
+.risk-label {
+    font-size: 14px;
+    color: #111827;
+}
+
+.risk-button {
+    width: 100%;
+    margin: 30px 0 0 0;
+    background: #3b82f6;
+    padding: 10px 30px;
+}
+
+.risk-button.btn-prymary {
+    font-size: 16px;
+    font-weight: 400;
+}
+
+.scan-button:hover {
+    background: color-mix(in srgb, #3b82f6 90%, black);
+}
+
+.risk-button__img {
+    margin: 0 4px 0 0;
+}
+
+/*--- MODAL-RISK ---*/
+
+/*--- MODAL-CARD-EVENT ---*/
+.modal-event-house {
+    display: flex;
+    align-items: center;
+    margin: 0 0 16px 0;
+}
+
+.modal-event-house-group {
+    display: flex;
+    align-items: center;
+}
+
+.modal-event-house-group:not(:last-child) {
+    margin: 0 16px 0 0;
+}
+
+.modal-event-house-group__img {
+    margin: 0 4px 0 0;
+}
+
+.modal-event-house-group__text {
+    font-size: 14px;
+    color: var(--color-secondary-text);
+}
+
+.modal-card-event-title {
+    line-height: 150%;
+    color: #111827;
+    margin: 0 0 2px 0;
+}
+
+.modal-card-event-text {
+    font-size: 14px;
+    line-height: 143%;
+    color: var(--color-secondary-text);
+}
+
+.modal-card-event-status {
+    display: inline-block;
+    margin: 16px 0 14px 0;
+    border-radius: 9999px;
+    box-sizing: border-box;
+    padding: 4px 8px;
+    background: #fee2e2;
+    color: var(--bs-danger);
+    font-size: 14px;
+}
+
+.modal-card-event-subtitle {
+    font-weight: 500;
+    font-size: 14px;
+    line-height: 143%;
+    color: #111827;
+}
+
+.modal-card-event-subtext {
+    font-size: 12px;
+    line-height: 133%;
+    color: var(--color-secondary-text);
+}
+
+.word-person {
+    font-size: 14px;
+    line-height: 143%;
+    color: var(--bs-primary);
+    margin: 16px 0;
+}
+
+.form-card-event {
+    margin: 8px 0 0 0;
+}
+
+.btn-card-event {
+    margin: 22px 0 0 0;
+    color: var(--bs-body-bg);
+    background: var(--bs-danger);
+    width: 100%;
+    font-weight: 500;
+    font-size: 14px;
+}
+
+.btn-card-event--notification {}
+
+.form-card-event__input {
+    display: none;
+}
+
+.form-card-event__label {
+    display: block;
+    font-size: 14px;
+    line-height: 143%;
+    color: var(--color-text);
+    box-sizing: border-box;
+    padding: 0 0 0 26px;
+    position: relative;
+    cursor: pointer;
+}
+
+.form-card-event__label::before {
+    position: absolute;
+    content: '';
+    top: 50%;
+    transform: translateY(-50%);
+    left: 0;
+    width: 16px;
+    height: 16px;
+    border-radius: 2px 2px;
+    border: 1px solid var(--color-secondary-text);
+}
+
+.form-card-event__input:checked+.form-card-event__label::before {
+    background: var(--bs-success);
+    border: 1px solid var(--bs-success);
+}
+
+.form-card-event__label:not(:last-child) {
+    margin: 0 0 8px 0;
+}
+
+.btn-card-event--notification {
+    margin: 12px 0 0 0;
+    color: #991b1b;
+    background: #fecaca;
+}
+
+/*--- MODAL-CARD-EVENT ---*/
