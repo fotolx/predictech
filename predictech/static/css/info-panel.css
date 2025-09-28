@@ -1,0 +1,82 @@
+.container-info-panel {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 15px 15px 0 15px;
+}
+
+.main-title {}
+
+.actions {
+    display: flex;
+}
+
+.actions__item:not(:last-child) {
+    margin: 0 8px 0 0;
+}
+
+.export-report,
+.create-incident,
+.risks-anomalies {
+    position: relative;
+    border: none;
+    box-sizing: border-box;
+    padding: 8px 16px 8px 34px;
+    border-radius: 8px 8px;
+    font-size: 14px;
+    font-weight: 500;
+    transition: all .25s ease-in-out;
+    cursor: pointer;
+}
+
+.export-report::before,
+.create-incident::before,
+.risks-anomalies::before {
+    position: absolute;
+    content: '';
+    top: calc(50% - 6px);
+    left: 16px;
+    width: 12px;
+    height: 16px;
+    background-size: contain;
+    background-repeat: no-repeat;
+}
+
+.export-report {
+    background-color: var(--bs-secondary-bg);
+    color: var(--bs-body-color);
+}
+
+.export-report:hover {
+    background: color-mix(in srgb, var(--bs-secondary-bg) 90%, black);
+}
+
+.export-report::before {
+    background-image: url(../img/icon/report.svg);
+}
+
+.create-incident {
+    background-color: var(--bs-success-bg-subtle);
+    color: var(--bs-primary);
+}
+
+.create-incident:hover {
+    background: color-mix(in srgb, var(--bs-success-bg-subtle) 90%, black);
+}
+
+.create-incident::before {
+    background-image: url(../img/icon/incident.svg);
+}
+
+.risks-anomalies {
+    background-color: var(--bs-danger);
+    color: var(--bs-body-bg);
+}
+
+.risks-anomalies:hover {
+    background: color-mix(in srgb, var(--bs-danger) 90%, black);
+}
+
+.risks-anomalies::before {
+    background-image: url(../img/icon/risks.svg);
+}
