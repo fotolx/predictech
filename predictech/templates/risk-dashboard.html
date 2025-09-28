@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="ru">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AquaMonitor: прогноз состояния и рисков</title>
+    <meta name="description" content="Цифровой мониторинг для раннего обнаружения аномалий и прогнозирования аварий." />
+    <link rel="icon" type="image/png" href="img/icon/favicon-2.png">
+    <link rel="stylesheet" href="css/index.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+
+<body>
+    <div class="wrapper-main container">
+        <header class="header" id="header-container"></header>
+        <header class="header-navigation" id="header-navigation"></header>
+        <section class="info-panel">
+            <div class="container container-info-panel">
+                <div class="main-group-risk">
+                    <h1 class="main-title">Прогноз состояния и рисков</h1>
+                    <div class="model-stats">
+                        <div class="last-training-info">
+                            <div class="last-training-label">Последнее обучение:</div>
+                            <time class="last-training-date">15.01.2025, 03:20</time>
+                        </div>
+                        <div class="accuracy-info">
+                            <div class="model-accuracy-label">Точность модели:</div>
+                            <div class="model-accuracy-value">87.3%</div>
+                        </div>
+                        <div class="improvement-info">
+                            <div class="accuracy-improvement-label">Улучшение точности:</div>
+                            <div class="accuracy-improvement-value">+2.8%</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="actions" id="actions"></div>
+            </div>
+        </section>
+        <section class="metrics">
+            <div class="container container-metrics">
+                <div class="wrapper-allert-risk">
+                    <div class="alert-item alert-critical">
+                        <div class="alert-item-group">
+                            <img src="img/icon/clock.svg" alt="icon" class="alert-item-group__img">
+                            <div class="alert-title">Критический риск</div>
+                        </div>
+                        <div class="alert-message">T2 упадет ниже 55°C</div>
+                        <div class="alert-timing">через 4ч 20мин</div>
+                    </div>
+
+                    <div class="alert-item alert-critical">
+                        <div class="alert-item-group">
+                            <img src="img/icon/question.svg" alt="icon" class="alert-item-group__img">
+                            <div class="alert-title">Падение давления</div>
+                        </div>
+                        <div class="alert-message">Критическое снижение</div>
+                        <div class="alert-timing">через 12ч 45мин</div>
+                    </div>
+
+                    <div class="alert-item alert-warning">
+                        <div class="alert-item-group">
+                            <img src="img/icon/question-2.svg" alt="icon" class="alert-item-group__img">
+                            <div class="alert-title">Негативная тенденция</div>
+                        </div>
+                        <div class="alert-message">Отклонение ГВС растет</div>
+                        <div class="alert-timing">уже 3ч 15 минут</div>
+                    </div>
+
+                    <div class="alert-item alert-warning">
+                        <div class="alert-item-group">
+                            <img src="img/icon/icon-4.svg" alt="icon" class="alert-item-group__img">
+                            <div class="alert-title">Ухудшение метео-условий</div>
+                        </div>
+                        <div class="alert-message">Рекомендуется увеличить частоту проверок подвальных помещений</div>
+                        <div class="alert-timing">в течение 2 суток</div>
+                    </div>
+                </div>
+            </div>
+        </section>
+        <section class="layout">
+            <div class="container container-layout">
+                <div class="map-section map-section--heigth">
+                    <div class="main-content-prognoz">
+                        <div class="time-periods">
+                            <div class="time-periods__title">Общие данные</div>
+                            <div class="time-periods-inner">
+                                <button type="button" class="time-period">Смена</button>
+                                <button type="button" class="time-period time-period--active">Сутки</button>
+                                <button type="button" class="time-period">Неделя</button>
+                                <button type="button" class="time-period">Месяц</button>
+                            </div>
+                        </div>
+                        <div class="wrap-graf">
+                            <div class="chart-container">
+                                <div class="chart-title">Общее потребление ХВС, м3   </div>
+                                <canvas id="chart1"></canvas>
+                            </div>
+                            <div class="chart-container">
+                                <div class="chart-title">Общее потребление ГВС, м3   </div>
+                                <canvas id="chart2"></canvas>
+                            </div>
+                            <div class="chart-container">
+                                <div class="chart-title">Подача и обратка</div>
+                                <canvas id="chart3"></canvas>
+                            </div>
+                            <div class="chart-container">
+                                <div class="chart-title">Температуры T1 и T2 (среднее значение)</div>
+                                <canvas id="chart4"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="events-journal">
+                        <div class="events-journal__header">
+                            <h2 class="events-journal__title">Журнал работ</h2>
+                            <div class="events-journal__actions">
+                                <button class="events-journal__action events-journal__action--filter">
+                                    <img src="img/icon/fillter-2.svg" alt="" class="events-journal__icon">
+                                </button>
+                                <button class="events-journal__action events-journal__action--zoom">
+                                    <img src="img/icon/enlarged.svg" alt="" class="events-journal__icon">
+                                </button>
+                            </div>
+                        </div>                   
+                        <div class="events-journal__stats">
+                            <div class="stat-event">
+                                <div class="stat-event__value stat-event__value--true">23</div>
+                                <div class="stat-event__label">Истинные прогнозы</div>
+                            </div>
+                            <div class="stat-event">
+                                <div class="stat-event__value stat-event__value--false">4</div>
+                                <div class="stat-event__label">Ложные прогнозы</div>
+                            </div>
+                            <div class="stat-event">
+                                <div class="stat-event__value stat-event__value--process">8</div>
+                                <div class="stat-event__label">В процессе</div>
+                            </div>
+                            <div class="stat-event">
+                                <div class="stat-event__value stat-event__value--accuracy">87.3%</div>
+                                <div class="stat-event__label">Точность</div>
+                            </div>
+                        </div>
+                        <table class="events-table">
+                            <thead>
+                                <tr class="events-table__row">
+                                    <th class="col-address">Адрес</th>
+                                    <th class="col-param">Параметр</th>
+                                    <th class="col-probability">Вероятность</th>
+                                    <th class="col-forecast">Время прогноза</th>
+                                    <th class="col-fact">Фактическое время</th>
+                                    <th class="col-status">Статус</th>
+                                    <th class="col-action">Действие</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr class="events-table__row">
+                                    <td class="col-address">ул. Мира, 5</td>
+                                    <td class="col-param">T2 ниже 55°C</td>
+                                    <td class="col-probability"><span class="probability">95%</span></td>
+                                    <td class="col-forecast">14:30 (прогноз)</td>
+                                    <td class="col-fact">14:45 (факт)</td>
+                                    <td class="col-status"><span class="status-true">Подтверждено</span></td>
+                                    <td class="col-action">
+                                        <div class="action-true">
+                                            <img src="img/icon/check.svg" alt="check" class="action-true__img">
+                                            <span>Истинное</span>
+                                        </div>
+                                    </td>
+                                </tr>
+                                <tr class="events-table__row">
+                                    <td class="col-address">ул. Мира, 3</td>
+                                    <td class="col-param">Отклонение &gt;20%</td>
+                                    <td class="col-probability"><span class="probability">78%</span></td>
+                                    <td class="col-forecast">22:15 (прогноз)</td>
+                                    <td class="col-fact">Ожидается</td>
+                                    <td class="col-status"><span class="status-process">В процессе</span></td>
+                                    <td class="col-action">
+                                        <div class="action-btn btn-yes">
+                                            <img src="img/icon/check.svg" class="btn-yes-img" alt="">
+                                        </div>
+                                        <div class="action-btn btn-no">
+                                            <img src="img/icon/no-check.svg" alt="" class="btn-no-img">
+                                        </div>
+                                    </td>
+                                </tr>
+                                <tr class="events-table__row">
+                                    <td class="col-address">ул. Мира, 1</td>
+                                    <td class="col-param">Превышение нормы</td>
+                                    <td class="col-probability"><span class="probability">65%</span></td>
+                                    <td class="col-forecast">09:45 (прогноз)</td>
+                                    <td class="col-fact">Не произошло</td>
+                                    <td class="col-status"><span class="status-false">Ложный</span></td>
+                                    <td class="col-action">
+                                        <div class="action-false">
+                                            <img src="img/icon/no-check.svg" alt="" class="action-false__img">
+                                            <span>Ложное</span>
+                                        </div>
+                                    </td>
+                                </tr>
+                                <tr class="events-table__row">
+                                    <td class="col-address">ул. Мира, 7</td>
+                                    <td class="col-param">Падение давления</td>
+                                    <td class="col-probability"><span class="probability">85%</span></td>
+                                    <td class="col-forecast">18:20 (прогноз)</td>
+                                    <td class="col-fact">19:15 (факт)</td>
+                                    <td class="col-status"><span class="status-true">Подтверждено</span></td>
+                                    <td class="col-action">
+                                        <div class="action-true">
+                                            <img src="img/icon/check.svg" alt="check" class="action-true__img">
+                                            <span>Истинное</span>
+                                        </div>
+                                    </td>
+                                </tr>
+                                <tr class="events-table__row">
+                                    <td class="col-address">ул. Мира, 9</td>
+                                    <td class="col-param">Рост потребления</td>
+                                    <td class="col-probability"><span class="probability">72%</span></td>
+                                    <td class="col-forecast">Завтра 10:00</td>
+                                    <td class="col-fact">Ожидается</td>
+                                    <td class="col-status"><span class="status-wait">Ожидание</span></td>
+                                    <td class="col-action"><span class="action-wait">Ожидание события</span></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                <div class="houses-status houses-status--graf">
+                    <div class="mar-risk-content">
+                        <div class="mar-risk-conten__title">Карта прогнозных рисков</div>
+                        <div class="wrapper-map-graf">
+                            <div class="svg-container" id="svg-container">
+                            </div>
+                            <div class="wrapper-houses">
+                                <div class="wrapper-houses__item">
+                                    <div class="wrapper-houses__header status-houses--normal">
+                                        <div class="wrapper-houses__text">№1 98&nbsp;кв</div>
+                                    </div>
+                                    <div class="wrapper-houses__body">
+                                        <div class="wrapper-houses__title">ул. Мира,</div>
+                                    </div>
+                                </div>
+                                <div class="wrapper-houses__item">
+                                    <div class="wrapper-houses__header status-houses--warning">
+                                        <div class="wrapper-houses__text">№2 120&nbsp;кв</div>
+                                    </div>
+                                    <div class="wrapper-houses__body">
+                                        <div class="wrapper-houses__title">ул. Мира,</div>
+                                    </div>
+                                </div>
+                                <div class="wrapper-houses__item">
+                                    <div class="wrapper-houses__header status-houses--warning">
+                                        <div class="wrapper-houses__text">№3 85&nbsp;кв</div>
+                                    </div>
+                                    <div class="wrapper-houses__body">
+                                        <div class="wrapper-houses__title">ул. Мира,</div>
+                                    </div>
+                                </div>
+                                <div class="wrapper-houses__item">
+                                    <div class="wrapper-houses__header status-houses--critical">
+                                        <div class="wrapper-houses__text">№4 75&nbsp;кв</div>
+                                    </div>
+                                    <div class="wrapper-houses__body">
+                                        <div class="wrapper-houses__title">ул. Мира,</div>
+                                    </div>
+                                </div>
+                                <div class="wrapper-houses__item">
+                                    <div class="wrapper-houses__header status-houses--warning">
+                                        <div class="wrapper-houses__text">№5 110&nbsp;кв</div>
+                                    </div>
+                                    <div class="wrapper-houses__body">
+                                        <div class="wrapper-houses__title">ул. Мира,</div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div id="notification"></div>
+                            <div id="state-indicator"></div>
+                            <div class="wrapper-map-controls">
+                                <div class="map-controls">
+                                    <button class="map-controls__button map-controls__button--zoom-out"
+                                        type="button">-</button>
+                                    <div class="map-controls__scale">25%</div>
+                                    <button class="map-controls__button map-controls__button--zoom-in"
+                                        type="button">+</button>
+                                </div>
+                                <button type="button" class="btn-fullscreen">
+                                    <img src="img/icon/fullscreen.svg" alt="увеличить" class="btn-fullscreen__img">
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="audit-risks-anomalies">
+                        <div class="audit-risks-anomalies__title">Выявленные риски и аномалии</div>
+                        <div class="wrapper-card wrapper-card--graf" id="alerts-container"></div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <div id="side-panel"></div>
+        <div id="modal-confirm"></div>
+        <div id="modal-risk"></div>
+        <div id="modal-card-event"></div>
+    </div>
+    <script src="js/loadComponents.js"></script>
+    <script src="js/stateCard.js"></script>
+    <script src="js/notificationHouses.js"></script>
+    <script src="js/openModal.js"></script>
+    <script src="js/mapFullscreen.js"></script>
+    <script src="js/get-weather.js"></script>
+    <script src="js/inteddactor.js"></script>
+    <script src="js/chart.js"></script>
+    <script src="js/linkActive.js"></script>
+</body>
+
+</html>

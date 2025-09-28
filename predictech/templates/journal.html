@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="ru">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AquaMonitor</title>
+    <meta name="description" content="Цифровой мониторинг для раннего обнаружения аномалий и прогнозирования аварий." />
+    <link rel="icon" type="image/png" href="img/icon/favicon-2.png">
+    <link rel="stylesheet" href="css/index.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+
+<body>
+    <div class="wrapper-main container">
+        <header class="header" id="header-container"></header>
+        <header class="header-navigation" id="header-navigation"></header>
+        <section class="info-panel info-panel--journal">
+            <div class="container container-info-panel">
+                <div class="main-group-risk">
+                    <h1 class="main-title">Журнал работ</h1>
+                    <div class="model-stats">
+                        <div class="last-training-info">
+                            <div class="last-training-label">Последнее обучение:</div>
+                            <time class="last-training-date">15.01.2025, 03:20</time>
+                        </div>
+                        <div class="accuracy-info">
+                            <div class="model-accuracy-label">Точность модели:</div>
+                            <div class="model-accuracy-value">87.3%</div>
+                        </div>
+                        <div class="improvement-info">
+                            <div class="accuracy-improvement-label">Улучшение точности:</div>
+                            <div class="accuracy-improvement-value">+2.8%</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="actions" id="actions"></div>
+            </div>
+        </section>
+
+        <section class="layout">
+            <div class="container container-layout container-layout--report">
+                <div class="events-journal events-journal--report">                 
+                    <div class="events-journal__stats">
+                        <div class="stat-event">
+                            <div class="stat-event__value stat-event__value--true">23</div>
+                            <div class="stat-event__label">Истинные прогнозы</div>
+                        </div>
+                        <div class="stat-event">
+                            <div class="stat-event__value stat-event__value--false">4</div>
+                            <div class="stat-event__label">Ложные прогнозы</div>
+                        </div>
+                        <div class="stat-event">
+                            <div class="stat-event__value stat-event__value--process">8</div>
+                            <div class="stat-event__label">В процессе</div>
+                        </div>
+                        <div class="stat-event">
+                            <div class="stat-event__value stat-event__value--accuracy">87.3%</div>
+                            <div class="stat-event__label">Точность</div>
+                        </div>
+                    </div>
+                    <table class="events-table">
+                        <thead>
+                            <tr class="events-table__row">
+                                <th class="col-address">Адрес</th>
+                                <th class="col-param">Параметр</th>
+                                <th class="col-probability">Вероятность</th>
+                                <th class="col-forecast">Время прогноза</th>
+                                <th class="col-fact">Фактическое время</th>
+                                <th class="col-status">Статус</th>
+                                <th class="col-action">Действие</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr class="events-table__row">
+                                <td class="col-address">ул. Мира, 5</td>
+                                <td class="col-param">T2 ниже 55°C</td>
+                                <td class="col-probability"><span class="probability">95%</span></td>
+                                <td class="col-forecast">14:30 (прогноз)</td>
+                                <td class="col-fact">14:45 (факт)</td>
+                                <td class="col-status"><span class="status-true">Подтверждено</span></td>
+                                <td class="col-action">
+                                    <div class="action-true">
+                                        <img src="img/icon/check.svg" alt="check" class="action-true__img">
+                                        <span>Истинное</span>
+                                    </div>
+                                </td>
+                            </tr>
+                            <tr class="events-table__row">
+                                <td class="col-address">ул. Мира, 3</td>
+                                <td class="col-param">Отклонение &gt;20%</td>
+                                <td class="col-probability"><span class="probability">78%</span></td>
+                                <td class="col-forecast">22:15 (прогноз)</td>
+                                <td class="col-fact">Ожидается</td>
+                                <td class="col-status"><span class="status-process">В процессе</span></td>
+                                <td class="col-action">
+                                    <div class="action-btn btn-yes">
+                                        <img src="img/icon/check.svg" class="btn-yes-img" alt="">
+                                    </div>
+                                    <div class="action-btn btn-no">
+                                        <img src="img/icon/no-check.svg" alt="" class="btn-no-img">
+                                    </div>
+                                </td>
+                            </tr>
+                            <tr class="events-table__row">
+                                <td class="col-address">ул. Мира, 1</td>
+                                <td class="col-param">Превышение нормы</td>
+                                <td class="col-probability"><span class="probability">65%</span></td>
+                                <td class="col-forecast">09:45 (прогноз)</td>
+                                <td class="col-fact">Не произошло</td>
+                                <td class="col-status"><span class="status-false">Ложный</span></td>
+                                <td class="col-action">
+                                    <div class="action-false">
+                                        <img src="img/icon/no-check.svg" alt="" class="action-false__img">
+                                        <span>Ложное</span>
+                                    </div>
+                                </td>
+                            </tr>
+                            <tr class="events-table__row">
+                                <td class="col-address">ул. Мира, 7</td>
+                                <td class="col-param">Падение давления</td>
+                                <td class="col-probability"><span class="probability">85%</span></td>
+                                <td class="col-forecast">18:20 (прогноз)</td>
+                                <td class="col-fact">19:15 (факт)</td>
+                                <td class="col-status"><span class="status-true">Подтверждено</span></td>
+                                <td class="col-action">
+                                    <div class="action-true">
+                                        <img src="img/icon/check.svg" alt="check" class="action-true__img">
+                                        <span>Истинное</span>
+                                    </div>
+                                </td>
+                            </tr>
+                            <tr class="events-table__row">
+                                <td class="col-address">ул. Мира, 9</td>
+                                <td class="col-param">Рост потребления</td>
+                                <td class="col-probability"><span class="probability">72%</span></td>
+                                <td class="col-forecast">Завтра 10:00</td>
+                                <td class="col-fact">Ожидается</td>
+                                <td class="col-status"><span class="status-wait">Ожидание</span></td>
+                                <td class="col-action"><span class="action-wait">Ожидание события</span></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <div id="side-panel"></div>
+        <div id="modal-confirm"></div>
+        <div id="modal-risk"></div>
+        <div id="modal-card-event"></div>
+    </div>
+    <script src="js/loadComponents.js"></script>
+    <script src="js/stateCard.js"></script>
+    <script src="js/notificationHouses.js"></script>
+    <script src="js/openModal.js"></script>
+    <script src="js/mapFullscreen.js"></script>
+    <script src="js/get-weather.js"></script>
+    <script src="js/inteddactor.js"></script>
+    <script src="js/chart.js"></script>
+    <script src="js/linkActive.js"></script>
+</body>
+
+</html>
