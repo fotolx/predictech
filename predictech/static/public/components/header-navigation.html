@@ -1,9 +1,9 @@
         <div class="container container-header-navigation">
             <nav class="menu">
                 <ul class="list-menu">
-                    <li class="list-menu__item"><a href="{% block content %}{% url 'index' %}{% endblock content %}" class="list-menu__link">Мониторинг</a></li>
-                    <li class="list-menu__item"><a href="{% block content %}{% url 'risk-dashboard' %}{% endblock content %}" class="list-menu__link">Прогноз</a></li>
-                    <li class="list-menu__item"><a href="{% block content %}{% url 'journal' %}{% endblock content %}" class="list-menu__link">Журнал работ</a></li>
+                    <li class="list-menu__item"><a href="/index/" class="list-menu__link">Мониторинг</a></li>
+                    <li class="list-menu__item"><a href="/risk-dashboard/" class="list-menu__link">Прогноз</a></li>
+                    <li class="list-menu__item"><a href="/journal/" class="list-menu__link">Журнал работ</a></li>
                 </ul>
             </nav>
             <div class="weather">
@@ -14,6 +14,7 @@
                 <div class="weather__item wind-speed" id="wind-speed"></div>
             </div>
         </div>
+
 
 
 
