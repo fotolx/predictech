@@ -34,7 +34,8 @@ document.addEventListener("DOMContentLoaded", function () {
         { url: "static/public/components/modal-risk.html", id: "modal-risk" },
         { url: "static/public/components/modal-card-event.html", id: "modal-card-event" },
         { url: "static/public/components/svg-map.html", id: "svg-container" },
-        { url: "static/public/components/main-svg-map.html", id: "main-svg-container" }
+        { url: "static/public/components/main-svg-map.html", id: "main-svg-container" },
+        { url: "static/public/components/modal-card-event-2.html", id: "modal-card-event-2" }
     ];
 
     // Создаем массив промисов для всех загрузок
@@ -49,4 +50,5 @@ document.addEventListener("DOMContentLoaded", function () {
             console.error("Ошибка при загрузке компонентов:", error);
         });
 });
+
 
