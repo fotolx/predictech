@@ -129,6 +129,36 @@ function initSidePanel() {
             }
         }
     });
+
+    // ---------------------------
+    // НОВАЯ ЛОГИКА: events-table__row -> modal-card-event-2
+    // ---------------------------
+    document.addEventListener('click', function (e) {
+        // Открыть modal-card-event-2 при клике на любой элемент с классом events-table__row
+        const clickedEventRow = e.target.closest('.events-table__row');
+        if (clickedEventRow) {
+            const modalCardEvent2 = document.querySelector('.modal-card-event-2');
+            if (modalCardEvent2) {
+                modalCardEvent2.classList.add('modal-confirm--active');
+            } else {
+                console.warn('Клик по .events-table__row, но .modal-card-event-2 не найден.');
+            }
+            return;
+        }
+
+        // Закрытие: если клик произошёл по кнопке .modal-confirm-header__close внутри .modal-card-event-2
+        const closeBtn = e.target.closest('.modal-confirm-header__close');
+        if (closeBtn) {
+            // Убедимся, что кнопка находится внутри .modal-card-event-2
+            const insideModalCard2 = closeBtn.closest('.modal-card-event-2');
+            if (insideModalCard2) {
+                const modalCardEvent2 = document.querySelector('.modal-card-event-2');
+                if (modalCardEvent2) {
+                    modalCardEvent2.classList.remove('modal-confirm--active');
+                }
+            }
+        }
+    });
 }
 
 // Запускаем после загрузки DOM и компонентов
