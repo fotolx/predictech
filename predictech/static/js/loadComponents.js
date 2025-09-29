@@ -1,5 +1,4 @@
 document.addEventListener("DOMContentLoaded", function () {
-    // Функция для загрузки и вставки HTML-файлов
     function loadHTMLFile(url, elementId) {
         return fetch(url)
             .then(response => {
@@ -50,5 +49,6 @@ document.addEventListener("DOMContentLoaded", function () {
             console.error("Ошибка при загрузке компонентов:", error);
         });
 });
+
 
 
