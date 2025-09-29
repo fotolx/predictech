@@ -10,4 +10,7 @@ urlpatterns = [
     path('detector_data_log/', DetectorDataView.as_view(), name='detector_data_log'),
     path('detector/', DetectorView.as_view(), name='detector'),
     path('state_label/', StateLabelCreateView.as_view(), name='state_label'),
+    path('journal/', JournalView.as_view(), name='journal'),
+    path('risk-dashboard/', RiskDashboardView.as_view(), name='risk-dashboard'),
+    path('situation/', SituationView.as_view(), name='situation'),
 ]

@@ -11,6 +11,18 @@ from .models import *
 def home(request):
     return render(request, 'index.html')
 
+class JournalView(View):
+    def get(self, request, *args, **kwargs):
+        return render(request, 'journal.html')
+
+class RiskDashboardView(View):
+    def get(self, request, *args, **kwargs):
+        return render(request, "risk-dashboard.html")
+
+class SituationView(View):
+    def get(self, request, *args, **kwargs):
+        return render(request, "situation.html")
+    
 class HouseAlertsView(View):
 
     def get(self, request, *args, **kwargs):

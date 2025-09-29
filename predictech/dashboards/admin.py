@@ -24,6 +24,7 @@ class DetectorsAtHouseAdmin(admin.ModelAdmin):
     pass
 
 class DetectorDataAdmin(admin.ModelAdmin):
+    list_display = ("detector_id", "timestamp", "value",)
     pass
 
 class SavedModelAdmin(admin.ModelAdmin):
@@ -33,6 +34,7 @@ class ModelForHouseAdmin(admin.ModelAdmin):
     pass
 
 class StateLabelAdmin(admin.ModelAdmin):
+    list_display = ("timestamp", "state", "house_id",)
     pass
 
 admin_register(namespace=globals())
