@@ -47,6 +47,7 @@
 #scalable-svg {
     transition: transform 0.3s ease;
     transform-origin: center center;
+    border-radius: 8px 8px;
 }
 
 .houses-status {
@@ -549,8 +550,31 @@
 .status-houses--expectation .wrapper-houses__text {
     color: #2e2e2e;
 }
+
 .status-houses--expectation__critical .wrapper-houses__text {
     color: var(--bs-body-bg);
+}
+
+.stat-warning {
+    background: #fb923c;
+}
+
+.stat-success {
+    background: var(--bs-success);
+}
+
+.stat-danger {
+    background: var(--bs-danger);
+}
+
+.stat-warning .wrapper-houses__text,
+.stat-success .wrapper-houses__text,
+.stat-danger .wrapper-houses__text {
+    color: var(--bs-body-bg);
+}
+
+.status-houses--expectation__mark::before {
+    background: transparent;
 }
 
 .status-houses--critical.wrapper-houses__header {
@@ -629,6 +653,7 @@
     color: var(--bs-body-color);
     box-sizing: border-box;
     padding: 0 0 0px 24px;
+    font-weight: 400;
     position: relative;
 }
 
@@ -707,6 +732,12 @@
 .events-table__row:hover {
     background: var(--bs-secondary-bg);
     cursor: pointer;
+}
+
+
+.events-table__row-thead:hover {
+    background: transparent;
+    cursor: auto;
 }
 
 .events-table thead tr {
