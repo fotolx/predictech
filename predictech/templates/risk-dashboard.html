@@ -6,8 +6,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AquaMonitor: прогноз состояния и рисков</title>
     <meta name="description" content="Цифровой мониторинг для раннего обнаружения аномалий и прогнозирования аварий." />
-    <link rel="icon" type="image/png" href="img/icon/favicon-2.png">
-    <link rel="stylesheet" href="css/index.css">
+    <link rel="icon" type="image/png" href="img/icon/favicon-2.png' %}">
+    <link rel="stylesheet" href="css/index.css' %}">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 
@@ -42,7 +42,7 @@
                 <div class="wrapper-allert-risk">
                     <div class="alert-item alert-critical">
                         <div class="alert-item-group">
-                            <img src="img/icon/clock.svg" alt="icon" class="alert-item-group__img">
+                            <img src="{% static 'img/icon/clock.svg' %}" alt="icon" class="alert-item-group__img">
                             <div class="alert-title">Критический риск</div>
                         </div>
                         <div class="alert-message">T2 упадет ниже 55°C</div>
@@ -51,7 +51,7 @@
 
                     <div class="alert-item alert-critical">
                         <div class="alert-item-group">
-                            <img src="img/icon/question.svg" alt="icon" class="alert-item-group__img">
+                            <img src="{% static 'img/icon/question.svg' %}" alt="icon" class="alert-item-group__img">
                             <div class="alert-title">Падение давления</div>
                         </div>
                         <div class="alert-message">Критическое снижение</div>
@@ -60,7 +60,7 @@
 
                     <div class="alert-item alert-warning">
                         <div class="alert-item-group">
-                            <img src="img/icon/question-2.svg" alt="icon" class="alert-item-group__img">
+                            <img src="{% static 'img/icon/question-2.svg' %}" alt="icon" class="alert-item-group__img">
                             <div class="alert-title">Негативная тенденция</div>
                         </div>
                         <div class="alert-message">Отклонение ГВС растет</div>
@@ -69,7 +69,7 @@
 
                     <div class="alert-item alert-warning">
                         <div class="alert-item-group">
-                            <img src="img/icon/icon-4.svg" alt="icon" class="alert-item-group__img">
+                            <img src="{% static 'img/icon/icon-4.svg' %}" alt="icon" class="alert-item-group__img">
                             <div class="alert-title">Ухудшение метео-условий</div>
                         </div>
                         <div class="alert-message">Рекомендуется увеличить частоту проверок подвальных помещений</div>
@@ -115,10 +115,10 @@
                             <h2 class="events-journal__title">Журнал работ</h2>
                             <div class="events-journal__actions">
                                 <button class="events-journal__action events-journal__action--filter">
-                                    <img src="img/icon/fillter-2.svg" alt="" class="events-journal__icon">
+                                    <img src="{% static 'img/icon/fillter-2.svg' %}" alt="" class="events-journal__icon">
                                 </button>
                                 <button class="events-journal__action events-journal__action--zoom">
-                                    <img src="img/icon/enlarged.svg" alt="" class="events-journal__icon">
+                                    <img src="{% static 'img/icon/enlarged.svg' %}" alt="" class="events-journal__icon">
                                 </button>
                             </div>
                         </div>                   
@@ -162,7 +162,7 @@
                                     <td class="col-status"><span class="status-true">Подтверждено</span></td>
                                     <td class="col-action">
                                         <div class="action-true">
-                                            <img src="img/icon/check.svg" alt="check" class="action-true__img">
+                                            <img src="{% static 'img/icon/check.svg' %}" alt="check" class="action-true__img">
                                             <span>Истинное</span>
                                         </div>
                                     </td>
@@ -176,10 +176,10 @@
                                     <td class="col-status"><span class="status-process">В процессе</span></td>
                                     <td class="col-action">
                                         <div class="action-btn btn-yes">
-                                            <img src="img/icon/check.svg" class="btn-yes-img" alt="">
+                                            <img src="{% static 'img/icon/check.svg' %}" class="btn-yes-img" alt="">
                                         </div>
                                         <div class="action-btn btn-no">
-                                            <img src="img/icon/no-check.svg" alt="" class="btn-no-img">
+                                            <img src="{% static 'img/icon/no-check.svg' %}" alt="" class="btn-no-img">
                                         </div>
                                     </td>
                                 </tr>
@@ -192,7 +192,7 @@
                                     <td class="col-status"><span class="status-false">Ложный</span></td>
                                     <td class="col-action">
                                         <div class="action-false">
-                                            <img src="img/icon/no-check.svg" alt="" class="action-false__img">
+                                            <img src="{% static 'img/icon/no-check.svg' %}" alt="" class="action-false__img">
                                             <span>Ложное</span>
                                         </div>
                                     </td>
@@ -206,7 +206,7 @@
                                     <td class="col-status"><span class="status-true">Подтверждено</span></td>
                                     <td class="col-action">
                                         <div class="action-true">
-                                            <img src="img/icon/check.svg" alt="check" class="action-true__img">
+                                            <img src="{% static 'img/icon/check.svg' %}" alt="check" class="action-true__img">
                                             <span>Истинное</span>
                                         </div>
                                     </td>
@@ -283,7 +283,7 @@
                                         type="button">+</button>
                                 </div>
                                 <button type="button" class="btn-fullscreen">
-                                    <img src="img/icon/fullscreen.svg" alt="увеличить" class="btn-fullscreen__img">
+                                    <img src="{% static 'img/icon/fullscreen.svg' %}" alt="увеличить" class="btn-fullscreen__img">
                                 </button>
                             </div>
                         </div>
@@ -301,15 +301,15 @@
         <div id="modal-risk"></div>
         <div id="modal-card-event"></div>
     </div>
-    <script src="js/loadComponents.js"></script>
-    <script src="js/stateCard.js"></script>
-    <script src="js/notificationHouses.js"></script>
-    <script src="js/openModal.js"></script>
-    <script src="js/mapFullscreen.js"></script>
-    <script src="js/get-weather.js"></script>
-    <script src="js/inteddactor.js"></script>
-    <script src="js/chart.js"></script>
-    <script src="js/linkActive.js"></script>
+    <script src="{% static 'js/loadComponents.js' %}"></script>
+    <script src="{% static 'js/stateCard.js' %}"></script>
+    <script src="{% static 'js/notificationHouses.js' %}"></script>
+    <script src="{% static 'js/openModal.js' %}"></script>
+    <script src="{% static 'js/mapFullscreen.js' %}"></script>
+    <script src="{% static 'js/get-weather.js' %}"></script>
+    <script src="{% static 'js/inteddactor.js' %}"></script>
+    <script src="{% static 'js/chart.js' %}"></script>
+    <script src="{% static 'js/linkActive.js' %}"></script>
 </body>
 
 </html>

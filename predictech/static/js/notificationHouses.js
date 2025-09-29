@@ -25,14 +25,14 @@ function updateNotifications() {
             const notification = document.createElement('div');
             notification.className = 'display-notification display-notification--active';
             notification.innerHTML = `
-                <img src="img/icon/notification.svg" alt="внимание" class="display-notification__img">
+                <img src="/static/img/icon/notification.svg" alt="внимание" class="display-notification__img">
                 <div class="display-notification__content">
                     <div class="display-notification__title">${stateLocation.textContent}</div>
                     <div class="display-notification__text">${stateWarning.textContent}</div>
                     <button type="button" class="display-notification__btn">Создать инцидент</button>
                 </div>
                 <div class="notification-close">
-                    <img src="img/icon/close.svg" alt="закрыть" title="закрыть">
+                    <img src="/static/img/icon/close.svg" alt="закрыть" title="закрыть">
                 </div>
             `;
             

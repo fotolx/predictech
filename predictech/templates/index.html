@@ -1,3 +1,4 @@
+{% load static %}
 <!DOCTYPE html>
 <html lang="ru">
 
@@ -6,8 +7,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AquaMonitor: умный мониторинг водопровода</title>
     <meta name="description" content="Цифровой мониторинг для раннего обнаружения аномалий и прогнозирования аварий." />
-    <link rel="icon" type="image/png" href="img/icon/favicon-2.png">
-    <link rel="stylesheet" href="css/index.css">
+    <link rel="icon" type="image/png" href="{% static 'img/icon/favicon-2.png' %}">
+    <link rel="stylesheet" href="{% static 'css/index.css' %}">
 </head>
 
 <body>
@@ -27,7 +28,7 @@
                         <div class="stat-item">
                             <div class="summary-card__title">Сводка за сутки</div>
                             <div class="summary-card-fillter">
-                                <img src="img/icon/fillter.svg" alt="" class="summary-card-setting__img">
+                                <img src="{% static 'img/icon/fillter.svg' %}" alt="" class="summary-card-setting__img">
                             </div>
                         </div>
                         <div class="summary-card__stats">
@@ -144,7 +145,7 @@
                             <button class="map-controls__button map-controls__button--zoom-in" type="button">+</button>
                         </div>
                         <button type="button" class="btn-fullscreen">
-                            <img src="img/icon/fullscreen.svg" alt="увеличить" class="btn-fullscreen__img">
+                            <img src="{% static 'img/icon/fullscreen.svg' %}" alt="увеличить" class="btn-fullscreen__img">
                         </button>
                     </div>
                 </div>
@@ -153,10 +154,10 @@
                         <div class="houses-inner__title">Статус по домам</div>
                         <div class="houses-inner-group">
                             <div class="fillter-houses-status houses-item">
-                                <img src="img/icon/fillter-2.svg" alt="фильтр" class="fillter-houses-status__img">
+                                <img src="{% static 'img/icon/fillter-2.svg' %}" alt="фильтр" class="fillter-houses-status__img">
                             </div>
                             <div class="enlarged-houses-status houses-item">
-                                <img src="img/icon/enlarged.svg" alt="увеличить" class="enlarged-houses-status__img">
+                                <img src="{% static 'img/icon/enlarged.svg' %}" alt="увеличить" class="enlarged-houses-status__img">
                             </div>
                         </div>
                     </div>
@@ -170,14 +171,14 @@
         <div id="modal-risk"></div>
         <div id="modal-card-event"></div>
     </div>
-    <script src="js/loadComponents.js"></script>
-    <script src="js/stateCard.js"></script>
-    <script src="js/notificationHouses.js"></script>
-    <script src="js/openModal.js"></script>
-    <script src="js/mapFullscreen.js"></script>
-    <script src="js/get-weather.js"></script>    
-    <script src="js/inteddactor.js"></script>
-    <script src="js/linkActive.js"></script>
+    <script src="{% static 'js/loadComponents.js' %}"></script>
+    <script src="{% static 'js/stateCard.js' %}"></script>
+    <script src="{% static 'js/notificationHouses.js' %}"></script>
+    <script src="{% static 'js/openModal.js' %}"></script>
+    <script src="{% static 'js/mapFullscreen.js' %}"></script>
+    <script src="{% static 'js/get-weather.js' %}"></script>    
+    <script src="{% static 'js/inteddactor.js' %}"></script>
+    <script src="{% static 'js/linkActive.js' %}"></script>
 </body>
 
 </html>

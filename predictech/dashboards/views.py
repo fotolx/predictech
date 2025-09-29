@@ -9,7 +9,7 @@ from django.views.decorators.csrf import csrf_exempt
 from .models import *
 
 def home(request):
-    return render(request, 'flatpages/home.html')
+    return render(request, 'index.html')
 
 class HouseAlertsView(View):
 

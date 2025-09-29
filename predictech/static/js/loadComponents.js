@@ -25,16 +25,16 @@ document.addEventListener("DOMContentLoaded", function () {
 
     // Массив файлов для загрузки с соответствующими ID
     const filesToLoad = [
-        { url: "public/components/header.html", id: "header-container" },
-        { url: "public/components/header-navigation.html", id: "header-navigation" },
-        { url: "public/components/actions.html", id: "actions" },
-        { url: "public/components/indicator.html", id: "state-indicator" },
-        { url: "public/components/side-panel.html", id: "side-panel" },
-        { url: "public/components/modal-confirm.html", id: "modal-confirm" },
-        { url: "public/components/modal-risk.html", id: "modal-risk" },
-        { url: "public/components/modal-card-event.html", id: "modal-card-event" },
-        { url: "public/components/svg-map.html", id: "svg-container" },
-        { url: "public/components/main-svg-map.html", id: "main-svg-container" }
+        { url: "static/public/components/header.html", id: "header-container" },
+        { url: "static/public/components/header-navigation.html", id: "header-navigation" },
+        { url: "static/public/components/actions.html", id: "actions" },
+        { url: "static/public/components/indicator.html", id: "state-indicator" },
+        { url: "static/public/components/side-panel.html", id: "side-panel" },
+        { url: "static/public/components/modal-confirm.html", id: "modal-confirm" },
+        { url: "static/public/components/modal-risk.html", id: "modal-risk" },
+        { url: "static/public/components/modal-card-event.html", id: "modal-card-event" },
+        { url: "static/public/components/svg-map.html", id: "svg-container" },
+        { url: "static/public/components/main-svg-map.html", id: "main-svg-container" }
     ];
 
     // Создаем массив промисов для всех загрузок

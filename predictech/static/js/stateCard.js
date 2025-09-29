@@ -212,8 +212,8 @@ function createNotificationCard(item) {
     const fields = item.fields;
     const statusClass = fields.status === 'critical' ? 'notification-event--critical' : 'notification-event--warning';
     const priorityText = getPriorityText(fields.priority);
-    const iconSrc = fields.status === 'critical' ? 'img/icon/type-1.svg' : 'img/icon/type-3.svg';
-    const eyeIconSrc = fields.status === 'critical' ? 'img/icon/eye.svg' : 'img/icon/eye-2.svg';
+    const iconSrc = fields.status === 'critical' ? '/static/img/icon/type-1.svg' : '/static/img/icon/type-3.svg';
+    const eyeIconSrc = fields.status === 'critical' ? '/static/img/icon/eye.svg' : '/static/img/icon/eye-2.svg';
     
     return `
         <article class="notification-event ${statusClass}">
@@ -229,7 +229,7 @@ function createNotificationCard(item) {
                         </a>
                         ${fields.status === 'critical' ? `
                         <div class="group-notification notification-event-key key-notification">
-                            <img src="img/icon/key.svg" alt="Настройки" class="notification-event-key__img">
+                            <img src="/static/img/icon/key.svg" alt="Настройки" class="notification-event-key__img">
                         </div>
                         ` : ''}
                     </div>
@@ -308,10 +308,10 @@ function createStateCard(item) {
                 <div class="state-header__inner">
                     ${showAdditionalElements ? `
                     <a href="../../situation.html" class="notification-state">
-                        <img src="img/icon/eye.svg" alt="Показать уведомления" class="notification-state__img">
+                        <img src="/static/img/icon/eye.svg" alt="Показать уведомления" class="notification-state__img">
                     </a>
                     <div class="settings-houses key-notification">
-                        <img src="img/icon/key.svg" alt="Настройки" class="settings-houses__img">
+                        <img src="/static/img/icon/key.svg" alt="Настройки" class="settings-houses__img">
                     </div>
                     ` : ''}
                     <div class="${statusClass}">
