@@ -224,7 +224,7 @@ function createNotificationCard(item) {
                 <div class="notification-event__header">
                     <time class="notification-event__time">${formatDateTime(fields.date_time)}</time>
                     <div class="notification-event__inner">
-                        <a href="{% url 'situation' %}" class="group-notification notification-event-eye">
+                        <a href="{% block content %}{% url 'situation' %}{% endblock content %}" class="group-notification notification-event-eye">
                             <img src="${eyeIconSrc}" alt="проверить" class="notification-event-eye__img">
                         </a>
                         ${fields.status === 'critical' ? `
@@ -307,7 +307,7 @@ function createStateCard(item) {
                 <div class="state-time">${formatDateTime(fields.date_time)}</div>
                 <div class="state-header__inner">
                     ${showAdditionalElements ? `
-                    <a href="{% url 'situation' %}" class="notification-state">
+                    <a href="{% block content %}{% url 'situation' %}{% endblock content %}" class="notification-state">
                         <img src="/static/img/icon/eye.svg" alt="Показать уведомления" class="notification-state__img">
                     </a>
                     <div class="settings-houses key-notification">
@@ -385,4 +385,5 @@ document.addEventListener('DOMContentLoaded', function() {
 // Обновление каждые 5 минут
 
 setInterval(loadAlerts, 5 * 60 * 1000);
+
 
