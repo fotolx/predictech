@@ -51,6 +51,36 @@
     justify-content: space-between;
     margin: 0 0 16px 0;
 }
+.side-panel-group {
+    display: flex;
+    align-items: center;
+}
+.notification-filter {
+    margin: 0 0 0 16px;
+}
+.filter-btn {
+    box-sizing: border-box;
+    padding: 4px 14px;
+    font-size: 12px;
+    border-radius: 100px;
+    border: none;
+    cursor: pointer;
+}
+.filter-btn:not(:last-child) {
+    margin: 0 4px 0 0;
+}
+.filter-all-active {
+    color: #9ca3af;
+    background: var(--bg-border-light);
+}
+.filter-critical {
+    color: var(--bs-danger);
+    background: #fee2e2;
+}
+.filter-warning {
+    color: #9a3412;
+    background: #ffedd5;
+}
 
 .side-panel__title {
     font-size: 18px;
