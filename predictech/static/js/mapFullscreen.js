@@ -1,4 +1,3 @@
-// Конфигурационные константы
 const SCALE_CONFIG = {
     minScale: 0.25,
     maxScale: 5,
@@ -10,9 +9,8 @@ const SCALE_CONFIG = {
 let currentScale = SCALE_CONFIG.initialScale;
 let svgElement, scaleDisplay, zoomInBtn, zoomOutBtn, fullscreenBtn;
 
-// Основная функция инициализации
 function initSVGScaler() {
-    // Попытка найти элементы с задержкой
+    
     setTimeout(() => {
         svgElement = document.getElementById('scalable-svg');
         scaleDisplay = document.querySelector('.map-controls__scale');
@@ -28,15 +26,12 @@ function initSVGScaler() {
             return;
         }
 
-        // Инициализация обработчиков событий
         initEventListeners();
         updateDisplay();
         
-        console.log('SVG Scaler инициализирован успешно');
     }, 100); // Начальная задержка
 }
 
-// Инициализация обработчиков событий
 function initEventListeners() {
     zoomInBtn.addEventListener('click', zoomIn);
     zoomOutBtn.addEventListener('click', zoomOut);
@@ -116,13 +111,10 @@ function resetScale() {
     applyScale();
 }
 
-// Инициализация после загрузки DOM с дополнительной задержкой
 document.addEventListener('DOMContentLoaded', () => {
-    // Двойная задержка для гарантии что DOM полностью готов
     setTimeout(initSVGScaler, 300);
 });
 
-// Экспорт функций для использования извне (если нужно)
 window.SVGScaler = {
     zoomIn,
     zoomOut,
@@ -130,3 +122,4 @@ window.SVGScaler = {
     resetScale,
     toggleFullscreen
 };
+
