@@ -1,20 +1,15 @@
 // Основная функция инициализации
 function initializeExportButton() {
-    console.log('Скрипт экспорта запущен...');
-    
-    // Функция для поиска кнопки с повторными попытками
     function findExportButtonWithRetry(retries = 10, delay = 500) {
         return new Promise((resolve, reject) => {
             let attempts = 0;
             
             const searchButton = () => {
                 attempts++;
-                console.log(`Попытка найти кнопку экспорта: ${attempts}/${retries}`);
                 
                 const exportButton = document.querySelector('button.actions__item.export-report');
                 
                 if (exportButton) {
-                    console.log('Кнопка экспорта найдена!');
                     resolve(exportButton);
                     return;
                 }
@@ -24,7 +19,6 @@ function initializeExportButton() {
                     return;
                 }
                 
-                // Пробуем еще раз через задержку
                 setTimeout(searchButton, delay);
             };
             
@@ -32,16 +26,12 @@ function initializeExportButton() {
         });
     }
 
-    // Запускаем поиск кнопки
     findExportButtonWithRetry()
         .then(exportButton => {
-            console.log('Добавляем обработчик на кнопку экспорта');
-            
-            // Удаляем существующие обработчики чтобы избежать дублирования
+
             exportButton.replaceWith(exportButton.cloneNode(true));
             const newExportButton = document.querySelector('button.actions__item.export-report');
             
-            // Добавляем наш обработчик
             newExportButton.addEventListener('click', function(event) {
                 console.log('Нажата кнопка экспорта');
                 event.preventDefault();
@@ -50,7 +40,6 @@ function initializeExportButton() {
                 handleExportClick();
             });
             
-            console.log('Обработчик успешно добавлен');
         })
         .catch(error => {
             console.error('Ошибка инициализации:', error.message);
@@ -63,15 +52,12 @@ function initializeExportButton() {
 
 // Обработчик клика по кнопке экспорта
 function handleExportClick() {
-    console.log('Обработка клика экспорта...');
     
-    // Проверяем, находится ли пользователь на странице отчета
     if (!isOnReportPage()) {
         alert('Для того чтобы скачать отчет необходимо перейти на страницу "Журнал работ" или "Прогноз"');
         return;
     }
     
-    // Проверяем наличие таблицы с повторными попытками
     findTableWithRetry()
         .then(table => {
             console.log('Таблица найдена, начинаем экспорт...');
@@ -83,7 +69,6 @@ function handleExportClick() {
         });
 }
 
-// Поиск таблицы с повторными попытками
 function findTableWithRetry(retries = 5, delay = 300) {
     return new Promise((resolve, reject) => {
         let attempts = 0;
@@ -128,7 +113,6 @@ function isOnReportPage() {
     // Проверяем наличие таблицы на странице
     const hasTable = document.querySelector('.events-table') !== null;
     
-    console.log('Проверка страницы:', { isReportPage, hasReportContent, hasTable });
     
     return isReportPage || hasReportContent || hasTable;
 }
@@ -136,7 +120,6 @@ function isOnReportPage() {
 // Функция экспорта таблицы в Excel
 function exportTableToExcel(table) {
     try {
-        console.log('Начинаем экспорт в Excel...');
         
         // Проверяем, подключена ли библиотека XLSX
         if (typeof XLSX === 'undefined') {
@@ -253,22 +236,16 @@ function exportTableToCSV(table) {
         
         // Освобождаем память
         setTimeout(() => URL.revokeObjectURL(url), 100);
-        console.log('Экспорт в CSV завершен успешно!');
         
     } catch (error) {
-        console.error('Ошибка при экспорте в CSV:', error);
         alert('Произошла ошибка при экспорте отчета.');
     }
 }
 
-// Несколько стратегий инициализации для надежности
 function init() {
-    console.log('Инициализация скрипта экспорта...');
     
-    // Стратегия 1: Ждем полной загрузки DOM
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', () => {
-            console.log('DOM загружен, инициализируем кнопку...');
             setTimeout(initializeExportButton, 1000);
         });
     } else {
@@ -281,15 +258,12 @@ function init() {
     setTimeout(() => {
         const existingButton = document.querySelector('button.actions__item.export-report');
         if (!existingButton || !existingButton.hasAttribute('data-export-handler')) {
-            console.log('Повторная попытка инициализации...');
             initializeExportButton();
         }
     }, 5000);
 }
-
-// Запускаем инициализацию
 init();
 
-// Экспортируем функции для глобального доступа (если нужно)
 window.initializeExportButton = initializeExportButton;
+
 window.handleExportClick = handleExportClick;
