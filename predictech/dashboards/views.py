@@ -6,6 +6,8 @@ from django.core.serializers import serialize
 from django.http import HttpResponse
 from django.utils.decorators import method_decorator  
 from django.views.decorators.csrf import csrf_exempt 
+from django.utils import timezone
+from datetime import timedelta
 from .models import *
 
 def home(request):
@@ -68,8 +70,19 @@ class DetectorDataView(View):
             qs = DetectorData.objects.all()
             data = serialize("json", qs)
             return HttpResponse(data, content_type="application/json", status=200)
-        qs = DetectorData.objects.filter(detector_id=request.GET.get("detector_id")).order_by('-timestamp')[0]
-        data = serialize("json", [qs])
+        now = timezone.now()
+        if request.GET.get("range") is None:
+            qs = DetectorData.objects.filter(detector_id=request.GET.get("detector_id")).order_by('-timestamp')
+        elif request.GET.get("range") == "day":
+            qs = DetectorData.objects.filter(detector_id=request.GET.get("detector_id"), timestamp__day=now.day).order_by('-timestamp')
+        elif request.GET.get("range") == "week":
+            qs = DetectorData.objects.filter(detector_id=request.GET.get("detector_id"), timestamp__date__gte=(now - timedelta(days=7)).date()).order_by('-timestamp')
+        elif request.GET.get("range") == "month":
+            qs = DetectorData.objects.filter(detector_id=request.GET.get("detector_id"), timestamp__date__gte=(now - timedelta(days=30)).date()).order_by('-timestamp')
+        elif request.GET.get("range") == "last":
+            qs = DetectorData.objects.filter(detector_id=request.GET.get("detector_id")).order_by('-timestamp').first()
+            qs = [qs]
+        data = serialize("json", qs)
         return HttpResponse(data, content_type="application/json", status=200)
     
 class DetectorView(View):
