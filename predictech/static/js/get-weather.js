@@ -1,4 +1,3 @@
-// Функция для получения иконки погоды по описанию
 function getWeatherIcon(description) {
     const iconMap = {
         // Ясная погода
@@ -102,12 +101,11 @@ function getWeatherWithDelay() {
     }, 100); // Задержка 100ms для гарантии загрузки DOM
 }
 
-// Запускаем когда DOM загружен
 document.addEventListener('DOMContentLoaded', getWeatherWithDelay);
 
-// Альтернативный вариант если DOM уже загружен
 if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', getWeatherWithDelay);
 } else {
     getWeatherWithDelay();
+
 }
