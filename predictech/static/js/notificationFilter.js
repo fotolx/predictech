@@ -9,7 +9,7 @@ function updateFilterCounts() {
     const warningBtn = document.querySelector('.filter-warning');
     
     if (criticalBtn) criticalBtn.textContent = criticalCount;
-    if (warningBtn) warningBtn.textContent = warningCount + '+';
+    if (warningBtn) warningBtn.textContent = warningCount;
 }
 
 // Функция фильтрации уведомлений
@@ -73,3 +73,4 @@ if (document.readyState === 'loading') {
     initNotificationFilter();
 
 }
+
