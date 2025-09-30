@@ -1,5 +1,3 @@
-.container-metric {}
-
 .metrics-dashboard {
     display: flex;
     justify-content: space-between;
@@ -33,17 +31,16 @@
     line-height: 150%;
     color: var(--bs-body-color);
 }
-
-.summary-card-fillter {}
-
-.summary-card-setting__img {}
-
-.summary-card__stats {}
-
 .stat-item__label {
     font-size: 14px;
     font-weight: 500;
     color: var(--color-secondary-text);
+}
+
+sup {
+  vertical-align:middle;
+  font-size: 13px;
+  line-height: 1;
 }
 
 .stat-item__value {
@@ -117,4 +114,5 @@
     left: 0;
     height: 8px;
     border-radius: 100px;
+
 }
