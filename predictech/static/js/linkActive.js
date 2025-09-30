@@ -1,21 +1,25 @@
 function setActiveMenuClass() {
-    // Получаем текущий URL
+    // Получаем текущий URL и путь
     const currentUrl = window.location.href;
+    const currentPath = window.location.pathname;
     
-    // Получаем все ссылки в меню
     const menuLinks = document.querySelectorAll('.list-menu__link');
     
     // Перебираем все ссылки
     menuLinks.forEach(link => {
-        // Получаем href ссылки и извлекаем имя файла
+        // Получаем href ссылки
         const linkHref = link.getAttribute('href');
-        const fileName = linkHref.split('/').pop(); // получаем последнюю часть пути (имя файла)
         
-        // Проверяем, заканчивается ли текущий URL на имя файла
-        if (currentUrl.endsWith(fileName)) {
+        link.classList.remove('list-menu__link--active');
+        
+        // Для главной страницы (href="/")
+        if (linkHref === '/' && (currentPath === '/' || currentPath === '')) {
             link.classList.add('list-menu__link--active');
-        } else {
-            link.classList.remove('list-menu__link--active');
+            return;
+        }
+        
+        if (linkHref !== '/' && currentPath.startsWith(linkHref)) {
+            link.classList.add('list-menu__link--active');
         }
     });
 }
@@ -26,5 +30,4 @@ document.addEventListener('DOMContentLoaded', function() {
     setTimeout(setActiveMenuClass, 100);
 });
 
-// Также запускаем при изменении URL (если страница динамическая)
 window.addEventListener('popstate', setActiveMenuClass);
