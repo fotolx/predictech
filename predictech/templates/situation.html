@@ -127,7 +127,7 @@
                         </div>
                         <table class="events-table">
                             <thead>
-                                <tr class="events-table__row">
+                                <tr class="events-table__row events-table__row-thead">
                                     <th class="col-address events-table__row-thead">Адрес</th>
                                     <th class="col-param">Параметр</th>
                                     <th class="col-probability">Вероятность</th>
@@ -147,7 +147,7 @@
                                     <td class="col-status"><span class="status-true">Подтверждено</span></td>
                                     <td class="col-action">
                                         <div class="action-true">
-                                            <img src="img/icon/check.svg" alt="check" class="action-true__img">
+                                            <img src="{% static 'img/icon/check.svg' %}" alt="check" class="action-true__img">
                                             <span>Истинное</span>
                                         </div>
                                     </td>
@@ -161,10 +161,10 @@
                                     <td class="col-status"><span class="status-process">В процессе</span></td>
                                     <td class="col-action">
                                         <div class="action-btn btn-yes">
-                                            <img src="img/icon/check.svg" class="btn-yes-img" alt="">
+                                            <img src="{% static 'img/icon/check.svg' %}" class="btn-yes-img" alt="">
                                         </div>
                                         <div class="action-btn btn-no">
-                                            <img src="img/icon/no-check.svg" alt="" class="btn-no-img">
+                                            <img src="{% static 'img/icon/no-check.svg' %}" alt="" class="btn-no-img">
                                         </div>
                                     </td>
                                 </tr>
@@ -177,7 +177,7 @@
                                     <td class="col-status"><span class="status-false">Ложный</span></td>
                                     <td class="col-action">
                                         <div class="action-false">
-                                            <img src="img/icon/no-check.svg" alt="" class="action-false__img">
+                                            <img src="{% static 'img/icon/no-check.svg' %}" alt="" class="action-false__img">
                                             <span>Ложное</span>
                                         </div>
                                     </td>
@@ -191,7 +191,7 @@
                                     <td class="col-status"><span class="status-true">Подтверждено</span></td>
                                     <td class="col-action">
                                         <div class="action-true">
-                                            <img src="img/icon/check.svg" alt="check" class="action-true__img">
+                                            <img src="{% static 'img/icon/check.svg' %}" alt="check" class="action-true__img">
                                             <span>Истинное</span>
                                         </div>
                                     </td>
@@ -340,6 +340,7 @@
 
 
 </html>
+
 
 
 
