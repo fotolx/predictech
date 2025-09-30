@@ -757,6 +757,14 @@
     padding: 8px 0;
 }
 
+.events-table__row .col-address {
+    text-align: left;
+}
+
+.events-table__row .col-address.col-address--thead {
+    text-align: center;
+}
+
 .events-table th {
     font-size: 14px;
     font-weight: 700;
@@ -877,4 +885,3 @@
 }
 
 /*--- EVENTS-JOURNAL ----*/
-
