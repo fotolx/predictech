@@ -473,7 +473,7 @@
 }
 
 .wrapper-houses__item {
-    width: calc(96px - 10px);
+    width: calc(90px - 10px);
 }
 
 .wrapper-houses__header {
@@ -877,3 +877,4 @@
 }
 
 /*--- EVENTS-JOURNAL ----*/
+
