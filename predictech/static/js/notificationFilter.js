@@ -1,4 +1,3 @@
-// Функция для обновления счетчиков на кнопках
 function updateFilterCounts() {
     const container = document.getElementById('notifications-container');
     if (!container) return;
@@ -6,7 +5,6 @@ function updateFilterCounts() {
     const criticalCount = container.querySelectorAll('.notification-event--critical').length;
     const warningCount = container.querySelectorAll('.notification-event--warning').length;
     
-    // Обновляем текст кнопок
     const criticalBtn = document.querySelector('.filter-critical');
     const warningBtn = document.querySelector('.filter-warning');
     
@@ -34,7 +32,6 @@ function filterNotifications(filterType) {
     });
 }
 
-// Инициализация скрипта
 function initNotificationFilter() {
     const filterContainer = document.querySelector('.notification-filter');
     
@@ -44,10 +41,8 @@ function initNotificationFilter() {
         return;
     }
     
-    // Обновляем счетчики при инициализации
     updateFilterCounts();
     
-    // Добавляем обработчики кликов на кнопки
     filterContainer.addEventListener('click', function(e) {
         if (e.target.classList.contains('filter-btn')) {
             // Убираем активный класс со всех кнопок
@@ -69,13 +64,12 @@ function initNotificationFilter() {
         }
     });
     
-    // Периодически обновляем счетчики (на случай добавления новых уведомлений)
     setInterval(updateFilterCounts, 2000);
 }
 
-// Запускаем скрипт когда DOM загружен
 if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', initNotificationFilter);
 } else {
     initNotificationFilter();
+
 }
