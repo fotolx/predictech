@@ -462,8 +462,8 @@
     justify-content: flex-start;
     align-items: flex-end;
     flex-wrap: wrap;
-    gap: 16px;
-    width: 226px;
+    gap: 12px;
+    width: 282px;
 }
 
 .wrapper-map-graf .wrapper-houses {
@@ -473,12 +473,12 @@
 }
 
 .wrapper-houses__item {
-    width: calc(80px - 16px);
+    width: calc(96px - 10px);
 }
 
 .wrapper-houses__header {
     box-sizing: border-box;
-    padding: 4px 6px 20px 6px;
+    padding: 4px 26px 26px 26px;
     text-align: center;
     border-radius: 4px 4px 0 0;
 }
@@ -493,14 +493,14 @@
     border-radius: 4px 4px;
     text-align: center;
     box-sizing: border-box;
-    padding: 3px 1px;
+    padding: 4px 1px;
     position: relative;
     top: -6px;
     border: 1px solid var(--bg-border);
 }
 
 .wrapper-houses__title {
-    font-size: 12px;
+    font-size: 11px;
 }
 
 .status-houses--normal {
@@ -511,7 +511,7 @@
     background-color: #fb923c;
 }
 
-.status-houses--critical {
+.status-houses--criticals {
     background-color: var(--bs-danger);
 }
 
