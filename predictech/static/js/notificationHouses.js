@@ -1,25 +1,19 @@
 function updateNotifications() {
-    // Находим контейнер для уведомлений
     const notificationContainer = document.getElementById('notification');
     
-    // Очищаем предыдущие уведомления
     notificationContainer.innerHTML = '';
     
-    // Находим все активные карточки
     const activeCards = document.querySelectorAll('.state-card.state-card--active');
     
-    // Если нет активных карточек, выходим
     if (activeCards.length === 0) {
         return;
     }
     
-    // Для каждой активной карточки создаем уведомление
     activeCards.forEach(card => {
         // Ищем данные внутри карточки
         const stateWarning = card.querySelector('.state-warning');
         const stateLocation = card.querySelector('.state-location');
         
-        // Если данные найдены, создаем уведомление
         if (stateWarning && stateLocation) {
             // Создаем элемент уведомления
             const notification = document.createElement('div');
@@ -48,7 +42,6 @@ function updateNotifications() {
     });
 }
 
-// Функция для наблюдения за изменениями DOM
 function observeChanges() {
     // Создаем наблюдатель за изменениями
     const observer = new MutationObserver(function(mutations) {
@@ -105,11 +98,10 @@ document.addEventListener('DOMContentLoaded', function() {
     observeChanges();
 });
 
-// Функция для принудительного обновления (можно вызывать после загрузки данных с сервера)
 function forceUpdateNotifications() {
     updateNotifications();
 }
 
-// Экспортируем функцию для внешнего использования
 window.updateNotifications = updateNotifications;
+
 window.forceUpdateNotifications = forceUpdateNotifications;
