@@ -98,6 +98,36 @@ function initSidePanel() {
     }
 
     // ---------------------------
+    // НОВАЯ ЛОГИКА: Кнопки создания инцидента -> modal-new-incident
+    // ---------------------------
+    document.addEventListener('click', function (e) {
+        // Открыть modal-new-incident при клике на кнопки создания инцидента
+        const createIncidentBtn = e.target.closest('.actions__item.create-incident, .display-notification__btn');
+        if (createIncidentBtn) {
+            const modalNewIncident = document.querySelector('.modal-new-incident');
+            if (modalNewIncident) {
+                modalNewIncident.classList.add('modal-confirm--active');
+            } else {
+                console.warn('Клик по кнопке создания инцидента, но .modal-new-incident не найден.');
+            }
+            return;
+        }
+
+        // Закрытие: если клик произошёл по кнопке .modal-confirm-header__close внутри .modal-new-incident
+        const closeBtn = e.target.closest('.modal-confirm-header__close');
+        if (closeBtn) {
+            // Убедимся, что кнопка находится внутри .modal-new-incident
+            const insideModalNewIncident = closeBtn.closest('.modal-new-incident');
+            if (insideModalNewIncident) {
+                const modalNewIncident = document.querySelector('.modal-new-incident');
+                if (modalNewIncident) {
+                    modalNewIncident.classList.remove('modal-confirm--active');
+                }
+            }
+        }
+    });
+
+    // ---------------------------
     // Новая логика: key-notification <-> modal-card-event
     // ---------------------------
     // Используем делегирование: надёжно работает для динамически добавляемых элементов.
@@ -161,8 +191,7 @@ function initSidePanel() {
     });
 }
 
-// Запускаем после загрузки DOM и компонентов
 document.addEventListener("DOMContentLoaded", function () {
-    // Даем время на загрузку динамических компонентов
     setTimeout(initSidePanel, 100);
 });
+
