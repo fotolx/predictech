@@ -191,8 +191,7 @@ function initSidePanel() {
     });
 }
 
-// Запускаем после загрузки DOM и компонентов
 document.addEventListener("DOMContentLoaded", function () {
-    // Даем время на загрузку динамических компонентов
     setTimeout(initSidePanel, 100);
 });
+
