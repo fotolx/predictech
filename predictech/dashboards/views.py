@@ -132,7 +132,7 @@ class HouseView(View):
             qs = House.objects.all()
             data = serialize("json", qs)
             return HttpResponse(data, content_type="application/json", status=200)
-        qs = House.objects.filter(id=request.GET.get("house_id"))
+        qs = House.objects.get(id=request.GET.get("house_id"))
         data = serialize("json", [qs])
         return HttpResponse(data, content_type="application/json", status=200)
 
