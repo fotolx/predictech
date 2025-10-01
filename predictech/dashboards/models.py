@@ -89,6 +89,7 @@ class SavedModel(models.Model):
     timestamp = models.DateTimeField(default=timezone.now)
     name = models.CharField(max_length=100)
     description = models.TextField(default="", blank=True)
+    accuracy = models.FloatField(default=0.0)
     file = models.FileField(upload_to=user_directory_path, max_length=255)
     def __str__(self):
         return self.timestamp.__str__()+" - "+self.name
@@ -96,6 +97,7 @@ class SavedModel(models.Model):
 class ModelForHouse(models.Model):
     house_id = models.ForeignKey(House, null=False, blank=False, on_delete=models.CASCADE)
     model_id = models.ForeignKey(SavedModel, null=False, blank=False, on_delete=models.CASCADE)
+    timestamp = models.DateTimeField(default=timezone.now)
     name = models.CharField(max_length=100)
     description = models.TextField(default="", blank=True)
     def __str__(self):

@@ -13,4 +13,7 @@ urlpatterns = [
     path('journal/', JournalView.as_view(), name='journal'),
     path('risk-dashboard/', RiskDashboardView.as_view(), name='risk-dashboard'),
     path('situation/', SituationView.as_view(), name='situation'),
+    path('train_model/', train_model, name='train_model'),
+    path('predict/', predict, name='predict'),
+    path('house/', HouseView.as_view(), name='house'),
 ]
