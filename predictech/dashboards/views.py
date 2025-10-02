@@ -455,14 +455,15 @@ def predict(request):
             print(str(data['timestamp'].max()+timedelta(hours=1)))
             print(f"🔮 Прогноз аномалии: {predicted_label_name}")
             print(f"🎯 Уверенность: {confidence:.2%}")
+            house_obj = House.objects.get(house_id=house)
             try:
-                label = StateLabel.objects.get(house_id=house, timestamp=data['timestamp'].max()+timedelta(hours=1))
+                label = StateLabel.objects.get(house_id=house_obj, timestamp=data['timestamp'].max()+timedelta(hours=1))
                 label.state = predicted_label_name
                 label.confidence = confidence
                 label.confirmed = False
                 label.save()
             except:
-                StateLabel.objects.create(house_id=house, timestamp=data['timestamp'].max()+timedelta(hours=1), state=predicted_label_name, confidence=confidence)
+                StateLabel.objects.create(house_id=house_obj, timestamp=data['timestamp'].max()+timedelta(hours=1), state=predicted_label_name, confidence=confidence)
             return HttpResponse(f"Прогноз на {str(data['timestamp'].max()+timedelta(hours=1))}: {predicted_label_name} (уверенность: {confidence:.2%})", status=200)
         else:
             return HttpResponse(f"❌ Недостаточно данных для предсказания. Нужно {predictor.sequence_length}, есть {len(features)}", status=400)
