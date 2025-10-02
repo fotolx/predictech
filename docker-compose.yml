@@ -1,0 +1,14 @@
+services:
+  web:
+    build:
+      context: .
+      # Используем целевой каталог для кеширования
+      dockerfile: Dockerfile
+    command: python3 manage.py runserver 0.0.0.0:8105
+    volumes:
+      - ./predictech:/usr/src/app/
+    ports:
+      - 8105:8105
+    # Добавляем кеширование для pip
+    environment:
+      PIP_CACHE_DIR: /root/.cache/pip
