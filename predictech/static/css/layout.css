@@ -39,6 +39,10 @@
     margin: 0 0 24px 0;
 }
 
+.main-content-prognoz--graf {
+    padding: 16px 16px 48px 16px;
+}
+
 .svg-container {
     width: 100%;
     height: auto;
@@ -75,6 +79,10 @@
     border: 1px solid var(--bg-border);
     height: 330px;
     margin: 0 0 24px 0;
+}
+
+.mar-risk-content--graf {
+    height: 368px;
 }
 
 .mar-risk-conten__title {
@@ -733,6 +741,7 @@
     background: var(--bs-secondary-bg);
     cursor: pointer;
 }
+
 
 
 .events-table__row-thead:hover {
