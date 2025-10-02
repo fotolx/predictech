@@ -98,6 +98,16 @@ class DetectorDataView(View):
         data = serialize("json", qs)
         return HttpResponse(data, content_type="application/json", status=200)
     
+class DetectorsAtHouseView(View):
+    def get(self, request, *args, **kwargs):
+        if request.GET.get("house_id") is None:
+            qs = DetectorsAtHouse.objects.all()
+            data = serialize("json", qs)
+            return HttpResponse(data, content_type="application/json", status=200)
+        qs = DetectorsAtHouse.objects.filter(house_id=request.GET.get("house_id"))
+        data = serialize("json", qs)
+        return HttpResponse(data, content_type="application/json", status=200)
+
 class DetectorView(View):
     def get(self, request, *args, **kwargs):
         if request.GET.get("detector_id") is None:

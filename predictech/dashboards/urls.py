@@ -9,6 +9,7 @@ urlpatterns = [
     path('detector_data/', DetectorDataCreateView.as_view(), name='detector_data'),
     path('detector_data_log/', DetectorDataView.as_view(), name='detector_data_log'),
     path('detector/', DetectorView.as_view(), name='detector'),
+    path('detectors_at_house/', DetectorsAtHouseView.as_view(), name='detectors_at_house'),
     path('state_label/', StateLabelCreateView.as_view(), name='state_label'),
     path('journal/', JournalView.as_view(), name='journal'),
     path('risk-dashboard/', RiskDashboardView.as_view(), name='risk-dashboard'),
