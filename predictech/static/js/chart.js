@@ -29,7 +29,6 @@ async function fetchWithFallback(url, options={}) {
   } catch(err){ console.warn('Прямая загрузка не удалась:', err.message); }
   for(const proxy of PROXIES){
     try{ 
-      console.log('Пробуем через прокси:', proxy); 
       const r = await fetch(proxy+url, options); 
       if(!r.ok) continue; 
       return await r.text();
@@ -80,9 +79,10 @@ async function loadForecastPerDetector() {
   const src = best.fields ? best.fields : best;
   const pick = name => safeNum(src[name]);
 
+  // Для расхода умножаем на 1000, чтобы совпадало с реальными данными
   return {
-    1:[pick('flow_xvs_168'), pick('flow_xvs_336'), pick('flow_xvs_504')],
-    2:[pick('flow_gvs_168'), pick('flow_gvs_336'), pick('flow_gvs_504')],
+    1:[pick('flow_xvs_168'), pick('flow_xvs_336'), pick('flow_xvs_504')].map(v=>v!==null?v*1000:null),
+    2:[pick('flow_gvs_168'), pick('flow_gvs_336'), pick('flow_gvs_504')].map(v=>v!==null?v*1000:null),
     3:[pick('temp_supply_168'), pick('temp_supply_336'), pick('temp_supply_504')],
     4:[pick('temp_return_168'), pick('temp_return_336'), pick('temp_return_504')]
   };
@@ -112,7 +112,6 @@ async function processChartMonthlyData() {
     const value = safeNum(f.value!==undefined?f.value:f.v);
     if(!id || !timestampStr || value===null) return;
 
-    // Жесткая фильтрация: только нужные id для графиков 1 и 2
     if(!chart1Ids.includes(id) && !chart2Ids.includes(id) && id!==3 && id!==4) return;
 
     const ts = new Date(timestampStr); if(isNaN(ts)) return;
@@ -121,7 +120,7 @@ async function processChartMonthlyData() {
     const weeksAgo = Math.floor((now-ts.getTime())/weekMs);
     if(weeksAgo<0||weeksAgo>4) return;
     const idx = 4-weeksAgo; 
-    const targetId = (chart1Ids.includes(id)?1:(chart2Ids.includes(id)?2:id)); // 1->ХВС,2->ГВС, 3->T1,4->T2
+    const targetId = (chart1Ids.includes(id)?1:(chart2Ids.includes(id)?2:id));
     sums[targetId][idx]+=value;
     counts[targetId][idx]+=1;
   });
@@ -176,7 +175,7 @@ function createChart(canvasId,datasets,unitType){
           mode:'index',intersect:false,
           callbacks:{
             title:items=>{const i=items[0].dataIndex; const label=chartCommonTimeLabels[i]||''; const date=weekDates[i]||''; return i>=5?`${label} (${date}) [ПРОГНОЗ]`:`${label} (${date})`;},
-            label:ctx=>{const y=ctx.parsed?.y; let l=ctx.dataset.label?ctx.dataset.label+': ':''; if(y===null||y===undefined||isNaN(y)) l+='нет данных'; else l+=(unitType==='flow'?Number(y).toFixed(3)+' м³':Number(y).toFixed(1)+' °C')+(ctx.dataIndex>=5?' (прогноз)':''); return l;}
+            label:ctx=>{const y=ctx.parsed?.y; let l=ctx.dataset.label?ctx.dataset.label+': ':''; if(y===null||y===undefined||isNaN(y)) l+='нет данных'; else l+=(unitType==='flow'?Number(y).toFixed(0)+' м³':Number(y).toFixed(1)+' °C')+(ctx.dataIndex>=5?' (прогноз)':''); return l;}
           }
         },
         legend:{display:true,position:'top'}
@@ -235,4 +234,3 @@ async function initializeCharts(){
 }
 
 document.addEventListener('DOMContentLoaded',()=>{initializeCharts();});
-
