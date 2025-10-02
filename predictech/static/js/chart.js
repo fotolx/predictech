@@ -1,355 +1,254 @@
+// -----------------------------
+// chart-combined.js
+// Полный объединённый скрипт: слева реальные данные, справа прогнозные
+// -----------------------------
+
 const chartCommonTimeLabels = ['-4 нед', '-3 нед', '-2 нед', '-1 нед', 'Сейчас', '+1 нед', '+2 нед', '+3 нед'];
 
-// -----------------------------
-// Загрузка реальных данных с сервера
-// -----------------------------
-async function loadChartData() {
-    const dataUrl = 'https://predictech.5d4.ru/detector_data_log/';
-    try {
-        console.log('Загрузка реальных данных с:', dataUrl);
-        const response = await fetch(dataUrl, { method: 'GET', mode: 'cors' });
-        if (!response.ok) throw new Error(`HTTP ${response.status}`);
-        const text = await response.text();
-        console.log('Сырые реальные данные:', text.substring(0, 200) + '...');
-        return processChartServerData(text);
-    } catch (err) {
-        console.warn('Прямая загрузка реальных данных не удалась:', err.message);
-        return tryChartAlternativeMethods(dataUrl);
-    }
-}
+// --- Настройки URL ---
+const REAL_DATA_URL = 'https://predictech.5d4.ru/detector_data_log/';
+const FORECAST_URL = 'https://predictech.5d4.ru/forecast/?house_id=2';
+
+// --- Прокси (fallback на случай CORS) ---
+const PROXIES = [
+  'https://corsproxy.io/?',
+  'https://api.codetabs.com/v1/proxy?quest=',
+  'https://proxy.cors.sh/',
+  'https://cors-anywhere.herokuapp.com/'
+];
 
 // -----------------------------
-// Загрузка прогнозных данных
+// УТИЛИТЫ
 // -----------------------------
-async function loadChartForecastData() {
-    const forecastUrl = 'https://predictech.5d4.ru/forecast/?house_id=2';
-    try {
-        console.log('Загрузка прогнозных данных с:', forecastUrl);
-        const response = await fetch(forecastUrl, { method: 'GET', mode: 'cors' });
-        if (!response.ok) throw new Error(`HTTP ${response.status}`);
-        const forecastJson = await response.json();
-        console.log('Прогнозные данные:', forecastJson);
-        
-        // Анализ временной метки прогноза
-        // timestamp - это момент времени, от которого делается прогноз
-        // Например: "2025-09-15 02:00:00" - прогноз сделан на основе данных на эту дату/время
-        const forecastTimestamp = new Date(forecastJson.timestamp);
-        console.log('Прогноз сделан на основе данных от:', forecastTimestamp);
-        
-        // Формируем массивы для 4 графиков
-        // Структура прогноза:
-        // flow_xvs_168 - расход ХВС через 168 часов (1 неделя)
-        // flow_xvs_336 - расход ХВС через 336 часов (2 недели)  
-        // flow_xvs_504 - расход ХВС через 504 часа (3 недели)
-        // Аналогично для ГВС и температур
-        return {
-            1: [forecastJson.flow_xvs_168, forecastJson.flow_xvs_336, forecastJson.flow_xvs_504], // ХВС
-            2: [forecastJson.flow_gvs_168, forecastJson.flow_gvs_336, forecastJson.flow_gvs_504], // ГВС
-            3: [forecastJson.temp_supply_168, forecastJson.temp_supply_336, forecastJson.temp_supply_504], // Подача
-            4: [forecastJson.temp_return_168, forecastJson.temp_return_336, forecastJson.temp_return_504], // Обратка
-            timestamp: forecastTimestamp // Сохраняем метку времени прогноза для отладки
-        };
-    } catch (err) {
-        console.warn('Ошибка загрузки прогнозных данных:', err.message);
-        // Возвращаем null для всех прогнозных значений в случае ошибки
-        return {
-            1: [null, null, null], 
-            2: [null, null, null], 
-            3: [null, null, null], 
-            4: [null, null, null],
-            timestamp: null
-        };
-    }
-}
-
-// -----------------------------
-// Обработка данных сервера (реальные)
-// -----------------------------
-function processChartServerData(text) {
-    const cleaned = text.trim();
-    try {
-        return JSON.parse(cleaned);
-    } catch (err) {
-        console.warn('JSON.parse не удался:', err.message);
-        const jsonMatch = cleaned.match(/\[.*\]/s);
-        if (jsonMatch) return JSON.parse(jsonMatch[0]);
-        throw new Error('Не удалось распарсить данные');
-    }
-}
-
-// -----------------------------
-// Альтернативные методы загрузки через прокси
-// -----------------------------
-async function tryChartAlternativeMethods(url) {
-    const proxies = [
-        'https://corsproxy.io/?',
-        'https://api.codetabs.com/v1/proxy?quest=',
-        'https://proxy.cors.sh/',
-        'https://cors-anywhere.herokuapp.com/'
-    ];
-    for (const proxy of proxies) {
-        try {
-            console.log('Пробуем прокси:', proxy);
-            const response = await fetch(proxy + url);
-            if (!response.ok) continue;
-            const text = await response.text();
-            return processChartServerData(text);
-        } catch (e) {
-            console.warn('Proxy не сработал:', proxy, e.message);
-        }
-    }
-    throw new Error('Все методы загрузки не сработали');
-}
-
-// -----------------------------
-// Даты для подписей графиков
-// -----------------------------
-function calculateWeekDates() {
-    const now = new Date();
-    const weekMs = 7 * 24 * 60 * 60 * 1000;
-    const arr = [];
-    // Прошлые недели (реальные данные)
-    for (let i = 4; i >= 1; i--) arr.push(formatDate(new Date(now - i * weekMs)));
-    // Текущая неделя
-    arr.push(formatDate(now));
-    // Будущие недели (прогноз)
-    for (let i = 1; i <= 3; i++) arr.push(formatDate(new Date(now.getTime() + i * weekMs)));
-    return arr;
-}
-
 function formatDate(d) {
-    return String(d.getDate()).padStart(2, '0') + '.' + String(d.getMonth() + 1).padStart(2, '0') + '.' + d.getFullYear();
+  return String(d.getDate()).padStart(2, '0') + '.' + String(d.getMonth() + 1).padStart(2, '0') + '.' + d.getFullYear();
+}
+
+function calculateWeekDates() {
+  const now = new Date();
+  const weekMs = 7 * 24 * 60 * 60 * 1000;
+  const arr = [];
+  for (let i = 4; i >= 1; i--) arr.push(formatDate(new Date(now.getTime() - i * weekMs)));
+  arr.push(formatDate(now));
+  for (let i = 1; i <= 3; i++) arr.push(formatDate(new Date(now.getTime() + i * weekMs)));
+  return arr;
+}
+
+function safeNum(v) {
+  if (v === null || v === undefined || v === '') return null;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : null;
+}
+
+// Универсальный fetch с fallback через прокси
+async function fetchWithFallback(url, options = {}) {
+  try {
+    const r = await fetch(url, options);
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    return await r.text();
+  } catch (err) {
+    for (const proxy of PROXIES) {
+      try {
+        const r = await fetch(proxy + url, options);
+        if (!r.ok) continue;
+        return await r.text();
+      } catch (e) { continue; }
+    }
+  }
+  throw new Error('Не удалось загрузить данные (включая все прокси)');
+}
+
+function parsePossiblyWrappedJson(text) {
+  const cleaned = String(text).trim();
+  try { return JSON.parse(cleaned); } catch(e){}
+  const arrMatch = cleaned.match(/\[.*\]/s);
+  if (arrMatch) return JSON.parse(arrMatch[0]);
+  const objMatch = cleaned.match(/\{.*\}/s);
+  if (objMatch) return JSON.parse(objMatch[0]);
+  throw new Error('Не удалось распарсить JSON');
 }
 
 // -----------------------------
-// Группировка данных по неделям
+// ЗАГРУЗКА ДАННЫХ
+// -----------------------------
+async function loadRealDetectorData() {
+  const txt = await fetchWithFallback(REAL_DATA_URL, { method: 'GET', mode: 'cors' });
+  const parsed = parsePossiblyWrappedJson(txt);
+  if (Array.isArray(parsed)) return parsed;
+  if (parsed && Array.isArray(parsed.results)) return parsed.results;
+  for (const k of Object.keys(parsed || {})) {
+    if (Array.isArray(parsed[k])) return parsed[k];
+  }
+  return [parsed];
+}
+
+async function loadForecastData() {
+  const txt = await fetchWithFallback(FORECAST_URL, { method: 'GET', mode: 'cors' });
+  const parsed = parsePossiblyWrappedJson(txt);
+  let best = Array.isArray(parsed) ? parsed.reduce((acc,it) => !acc || new Date(it.timestamp) > new Date(acc.timestamp) ? it : acc, null) : parsed;
+  const src = best.fields || best;
+  const pick = name => safeNum(src[name]);
+  return {
+    1: [pick('flow_xvs_168'), pick('flow_xvs_336'), pick('flow_xvs_504')],
+    2: [pick('flow_gvs_168'), pick('flow_gvs_336'), pick('flow_gvs_504')],
+    3: [pick('temp_supply_168'), pick('temp_supply_336'), pick('temp_supply_504')],
+    4: [pick('temp_return_168'), pick('temp_return_336'), pick('temp_return_504')]
+  };
+}
+
+// -----------------------------
+// ОБРАБОТКА ДАННЫХ В НЕДЕЛЬНЫЕ СЛОТЫ
 // -----------------------------
 async function processChartMonthlyData() {
-    const realData = await loadChartData();        // реальные данные
-    const forecastData = await loadChartForecastData(); // прогнозные данные
+  const [realSettled, forecastSettled] = await Promise.allSettled([loadRealDetectorData(), loadForecastData()]);
+  if (realSettled.status !== 'fulfilled') throw new Error('Ошибка загрузки реальных данных: ' + realSettled.reason);
+  const realData = realSettled.value;
+  const forecastMap = forecastSettled.status === 'fulfilled' ? forecastSettled.value : {1:[null,null,null],2:[null,null,null],3:[null,null,null],4:[null,null,null]};
 
-    console.log('Метка времени прогноза:', forecastData.timestamp);
+  // Аккумуляторы для сумм/средних
+  const sums = {1:Array(5).fill(0),2:Array(5).fill(0),3:Array(5).fill(0),4:Array(5).fill(0)};
+  const counts = {1:Array(5).fill(0),2:Array(5).fill(0),3:Array(5).fill(0),4:Array(5).fill(0)};
 
-    const dataByDetector = { 1: [], 2: [], 3: [], 4: [] };
-    realData.forEach(item => {
-        const id = item.fields.detector_id;
-        if (dataByDetector[id]) dataByDetector[id].push({
-            timestamp: new Date(item.fields.timestamp),
-            value: item.fields.value
-        });
-    });
+  // Жёсткая привязка исторических данных к детекторам
+  realData.forEach(item => {
+    const f = item.fields || item;
+    const id = Number(f.detector_id || f.detectorId || f.id || f.detector);
+    const ts = new Date(f.timestamp || f.time || f.date);
+    const val = safeNum(f.value !== undefined ? f.value : f.v);
+    if (!id || isNaN(ts) || val === null) return;
+    const weekMs = 7 * 24 * 60 * 60 * 1000;
+    const weeksAgo = Math.floor((Date.now() - ts.getTime()) / weekMs);
+    if (weeksAgo < 0 || weeksAgo > 4) return;
+    const idx = 4 - weeksAgo;
+    if (!sums[id]) return;
+    sums[id][idx] += val;
+    counts[id][idx]++;
+  });
 
-    Object.keys(dataByDetector).forEach(id => dataByDetector[id].sort((a, b) => a.timestamp - b.timestamp));
-
-    const now = new Date(), weekMs = 7 * 24 * 60 * 60 * 1000, fourWeeksAgo = new Date(now - weekMs * 4);
-    const weeklyData = { 1: Array(8).fill(null), 2: Array(8).fill(null), 3: Array(8).fill(null), 4: Array(8).fill(null) };
-    const weekCounts = { 1: Array(8).fill(0), 2: Array(8).fill(0), 3: Array(8).fill(0), 4: Array(8).fill(0) };
-
-    // -----------------------------
-    // Заполняем реальные данные (слева - позиции 0-4)
-    // -----------------------------
-    Object.keys(dataByDetector).forEach(id => {
-        dataByDetector[id].forEach(dp => {
-            if (dp.timestamp < fourWeeksAgo) return;
-            const diff = now - dp.timestamp;
-            let idx = 4;
-            if (diff > 0 && diff <= weekMs) idx = 3;
-            else if (diff <= 2 * weekMs) idx = 2;
-            else if (diff <= 3 * weekMs) idx = 1;
-            else if (diff <= 4 * weekMs) idx = 0;
-
-            weeklyData[id][idx] = (weeklyData[id][idx] || 0) + dp.value;
-            weekCounts[id][idx]++;
-        });
-    });
-
-    [1, 2, 3, 4].forEach(id => {
-        for (let i = 0; i < 5; i++) {
-            if (weekCounts[id][i] > 0) {
-                if (id > 2) weeklyData[id][i] /= weekCounts[id][i]; // средняя температура
-            } else weeklyData[id][i] = 0;
-        }
-        
-        // -----------------------------
-        // Заполняем прогнозные данные (справа - позиции 5-7)
-        // Позиции в массиве forecastData[id]:
-        // [0] - прогноз на +1 неделю (168 часов)
-        // [1] - прогноз на +2 недели (336 часов)  
-        // [2] - прогноз на +3 недели (504 часа)
-        // -----------------------------
-        for (let i = 5; i < 8; i++) {
-            weeklyData[id][i] = forecastData[id][i - 5];
-        }
-    });
-
-    console.log('Итоговые данные для графиков:', weeklyData);
-    return weeklyData;
-}
-
-// -----------------------------
-// Создание графика
-// -----------------------------
-function createChart(canvasId, datasets) {
-    const weekDates = calculateWeekDates();
-    return new Chart(document.getElementById(canvasId).getContext('2d'), {
-        type: 'line',
-        data: { labels: chartCommonTimeLabels, datasets },
-        options: {
-            responsive: true,
-            scales: {
-                x: {
-                    grid: {
-                        color: ctx => ctx.tick.value === 4 ? '#6b7280' : 'rgba(0,0,0,0.1)',
-                        lineWidth: ctx => ctx.tick.value === 4 ? 2 : 1,
-                        borderDash: ctx => ctx.tick.value === 4 ? [5, 5] : [],
-                        drawBorder: false
-                    },
-                    ticks: {
-                        callback: (value, index) => index === 4 ? 'Сейчас' : chartCommonTimeLabels[index]
-                    }
-                },
-                y: {
-                    beginAtZero: true,
-                    grid: { color: 'rgba(0,0,0,0.1)', borderDash: [5, 5] },
-                    border: { dash: [5, 5] }
-                }
-            },
-            plugins: {
-                tooltip: {
-                    mode: 'index',
-                    intersect: false,
-                    callbacks: {
-                        title: items => {
-                            const index = items[0].dataIndex;
-                            let label = `${chartCommonTimeLabels[index]} (${weekDates[index]})`;
-                            // Добавляем пометку для прогнозных данных
-                            if (index >= 5) {
-                                label += ' [ПРОГНОЗ]';
-                            }
-                            return label;
-                        },
-                        label: ctx => {
-                            let label = ctx.dataset.label ? ctx.dataset.label + ': ' : '';
-                            if (ctx.parsed.y != null) {
-                                if (label.includes('ХВС') || label.includes('ГВС')) label += ctx.parsed.y.toFixed(2) + ' м³';
-                                else label += ctx.parsed.y.toFixed(1) + ' °C';
-                                
-                                // Пометка для прогнозных значений
-                                if (ctx.dataIndex >= 5) {
-                                    label += ' (прогноз)';
-                                }
-                            } else label += 'нет данных';
-                            return label;
-                        }
-                    }
-                },
-                legend: {
-                    labels: {
-                        // Показываем в легенде, какие данные являются прогнозом
-                        generateLabels: function(chart) {
-                            const original = Chart.defaults.plugins.legend.labels.generateLabels;
-                            const labels = original.call(this, chart);
-                            
-                            // Добавляем пометку для прогнозных линий
-                            labels.forEach(label => {
-                                if (label.text.includes('ХВС') || label.text.includes('ГВС') || 
-                                    label.text.includes('Подача') || label.text.includes('Обратка') ||
-                                    label.text.includes('T1') || label.text.includes('T2')) {
-                                    label.text += ' (прогноз справа)';
-                                }
-                            });
-                            return labels;
-                        }
-                    }
-                }
-            },
-            elements: {
-                line: { 
-                    borderWidth: 1, 
-                    tension: 0.4,
-                    // Разный стиль линии для реальных и прогнозных данных
-                    borderDash: function(ctx) {
-                        // Для прогнозной части данных (позиции 5-7) используем пунктир
-                        return ctx.dataIndex >= 5 ? [5, 5] : [];
-                    }
-                },
-                point: { radius: 0 }
-            }
-        }
-    });
-}
-
-// -----------------------------
-// Подготовка датасетов для графиков
-// -----------------------------
-function prepareChartDatasets(monthlyData, ids, colors, labels) {
-    return ids.map((id, i) => {
-        const real = monthlyData[id].slice(0, 5);         // реальные данные (позиции 0-4)
-        const forecast = monthlyData[id].slice(5, 8);     // прогнозные данные (позиции 5-7)
-        
-        return {
-            label: labels[i],
-            data: [...real, null, ...forecast],           // Слева реальные, справа прогноз
-            borderColor: colors[i],
-            backgroundColor: colors[i] + '20',
-            fill: false,
-            tension: 0.4,
-            // Разный стиль для реальных и прогнозных данных
-            segment: {
-                borderDash: ctx => ctx.p1DataIndex >= 5 ? [5, 5] : [] // Пунктир для прогноза
-            }
-        };
-    });
-}
-
-// -----------------------------
-// Инициализация всех 4 графиков
-// -----------------------------
-async function initializeCharts() {
-    try {
-        const data = await processChartMonthlyData();
-
-        // График 1: Потребление ХВС
-        createChart('chart1', prepareChartDatasets(data, [1], ['#3b82f6'], ['Общее потребление ХВС, м³']));
-        
-        // График 2: Потребление ГВС  
-        createChart('chart2', prepareChartDatasets(data, [2], ['#a855f7'], ['Общее потребление ГВС, м³']));
-        
-        // График 3: Температуры подачи и обратки
-        createChart('chart3', prepareChartDatasets(data, [3, 4], ['#1e40af', '#a855f7'], ['Подача', 'Обратка']));
-        
-        // График 4: Средняя температура
-        const avg = data[3].map((v, i) => (v != null && data[4][i] != null) ? (v + data[4][i]) / 2 : null);
-        createChart('chart4', [
-            ...prepareChartDatasets(data, [3], ['#a855f7'], ['T1']),
-            ...prepareChartDatasets(data, [4], ['#3b82f6'], ['T2']),
-            {
-                label: 'Средняя температура', 
-                data: [...avg.slice(0, 5), null, ...avg.slice(5, 8)],
-                borderColor: '#10b981', 
-                tension: 0.4, 
-                borderDash: [5, 5], 
-                fill: false,
-                segment: {
-                    borderDash: ctx => ctx.p1DataIndex >= 5 ? [5, 5] : [] // Пунктир для прогноза
-                }
-            }
-        ]);
-        
-        // Добавляем информационное сообщение о прогнозе
-        const infoDiv = Object.assign(document.createElement('div'), {
-            style: 'color: #6b7280; text-align: center; padding: 10px; font-size: 12px; font-style: italic;',
-            textContent: 'Данные справа от вертикальной линии являются прогнозными и обновляются регулярно'
-        });
-        document.body.prepend(infoDiv);
-        
-    } catch (e) {
-        console.error('Ошибка инициализации:', e.message);
-        document.body.prepend(Object.assign(document.createElement('div'), {
-            style: 'color: red; text-align: center; padding: 20px',
-            textContent: 'Ошибка загрузки данных графиков: ' + e.message
-        }));
+  const weeklyData = {1:Array(8).fill(null),2:Array(8).fill(null),3:Array(8).fill(null),4:Array(8).fill(null)};
+  [1,2,3,4].forEach(id => {
+    for (let i=0;i<5;i++){
+      if(counts[id][i]===0) weeklyData[id][i]=null;
+      else weeklyData[id][i]=(id<=2 ? Number(sums[id][i].toFixed(3)) : Number((sums[id][i]/counts[id][i]).toFixed(2)));
     }
+    // Добавляем прогнозные данные справа
+    if(forecastMap && forecastMap[id]){
+      weeklyData[id][5]=forecastMap[id][0]||null;
+      weeklyData[id][6]=forecastMap[id][1]||null;
+      weeklyData[id][7]=forecastMap[id][2]||null;
+    }
+  });
+  return weeklyData;
 }
 
-document.addEventListener('DOMContentLoaded', initializeCharts);
+// -----------------------------
+// ВИЗУАЛИЗАЦИЯ (Chart.js)
+// -----------------------------
+const nowLinePlugin = {
+  id: 'nowLinePlugin',
+  afterDraw: chart => {
+    const xIndex = 4; 
+    const xScale = chart.scales.x;
+    if(!xScale) return;
+    const x = xScale.getPixelForValue(xIndex);
+    const ctx = chart.ctx;
+    const top = chart.chartArea.top;
+    const bottom = chart.chartArea.bottom;
+    ctx.save();
+    ctx.beginPath();
+    ctx.lineWidth=1.5; ctx.setLineDash([6,4]); ctx.strokeStyle='#6b7280';
+    ctx.moveTo(x,top); ctx.lineTo(x,bottom); ctx.stroke();
+    ctx.fillStyle='#6b7280'; ctx.textAlign='center'; ctx.font='12px Arial'; ctx.fillText('',x,bottom+20);
+    ctx.restore();
+  }
+};
+
+function createChart(canvasId,datasets,unitType){
+  const weekDates = calculateWeekDates();
+  const canvas = document.getElementById(canvasId);
+  if(!canvas) return null;
+  const ctx = canvas.getContext('2d');
+  const cfg={
+    type:'line',
+    data:{labels:chartCommonTimeLabels,datasets},
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      interaction:{mode:'index',intersect:false},
+      scales:{
+        x:{grid:{display:true},ticks:{callback:(val,idx)=>chartCommonTimeLabels[idx]||''}},
+        y:{beginAtZero:false,grid:{display:true}}
+      },
+      plugins:{
+        tooltip:{
+          mode:'index', intersect:false,
+          callbacks:{
+            title: items => {
+              const i = items[0].dataIndex;
+              const label = chartCommonTimeLabels[i] || '';
+              const date = weekDates[i] || '';
+              return i>=5?`${label} (${date}) [ПРОГНОЗ]`:`${label} (${date})`;
+            },
+            label: ctx => {
+              const y = ctx.parsed && ctx.parsed.y;
+              let label = ctx.dataset.label ? ctx.dataset.label+': ' : '';
+              if(y==null) return label+'нет данных';
+              return unitType==='flow'?label+Number(y).toFixed(3)+' м³':label+Number(y).toFixed(1)+' °C';
+            }
+          }
+        },
+        legend:{display:true,position:'top'}
+      },
+      elements:{line:{borderWidth:1,tension:0.35},point:{radius:3}}
+    },
+    plugins:[nowLinePlugin]
+  };
+  return new Chart(ctx,cfg);
+}
+
+function prepareChartDatasets(monthlyData, ids, colors, labels, unitType){
+  return ids.map((id,i)=>{
+    const arr = monthlyData[id]||Array(8).fill(null);
+    return {
+      label: labels[i],
+      data: arr,
+      borderColor: colors[i],
+      backgroundColor: colors[i]+'22',
+      fill:false,
+      tension:0.35,
+      pointRadius:3
+    };
+  });
+}
+
+// -----------------------------
+// ИНИЦИАЛИЗАЦИЯ ГРАФИКОВ
+// -----------------------------
+async function initializeCharts(){
+  try{
+    const monthly = await processChartMonthlyData();
+
+    // График 1 — ХВС
+    createChart('chart1',prepareChartDatasets(monthly,[1],['#3b82f6'],['Общее потребление ХВС, м³'],'flow'));
+    // График 2 — ГВС
+    createChart('chart2',prepareChartDatasets(monthly,[2],['#a855f7'],['Общее потребление ГВС, м³'],'flow'));
+    // График 3 — температуры
+    createChart('chart3',prepareChartDatasets(monthly,[3,4],['#1e40af','#a855f7'],['Подача','Обратка'],'temp'));
+    // График 4 — средняя температура
+    const avg = Array(8).fill(null).map((_,i)=>(monthly[3][i]!=null && monthly[4][i]!=null)?Number(((monthly[3][i]+monthly[4][i])/2).toFixed(2)):null);
+    createChart('chart4',[
+      ...prepareChartDatasets(monthly,[3],['#a855f7'],['T1'],'temp'),
+      ...prepareChartDatasets(monthly,[4],['#3b82f6'],['T2'],'temp'),
+      {label:'Средняя температура', data:avg, borderColor:'#10b981', borderDash:[6,4], fill:false, tension:0.35, pointRadius:0}
+    ],'temp');
+
+    console.log('Графики инициализированы успешно');
+  }catch(e){
+    console.error('Ошибка инициализации графиков:',e);
+    const el = document.createElement('div');
+    el.style='color:#7f1d1d;background:#fff1f2;border:1px solid #fecaca;padding:12px;margin:10px;text-align:center;';
+    el.textContent='Ошибка загрузки данных графиков: '+(e.message||e);
+    document.body.prepend(el);
+  }
+}
+
+document.addEventListener('DOMContentLoaded',initializeCharts);
