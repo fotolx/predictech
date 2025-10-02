@@ -658,11 +658,5 @@ def forecast(request):
         forecast_obj.save()
     except:
         Forecast.objects.create(timestamp=timestamp, house_id=house_obj, forecast=forecast.to_json())
-    try:
-        state_label_obj = StateLabel.objects.get(timestamp=timestamp, house_id=house_obj)
-        state_label_obj.state = forecast['state']
-        state_label_obj.save()
-    except:
-        StateLabel.objects.create(timestamp=timestamp, house_id=house_obj, state=forecast['state'])
 
     return HttpResponse(forecast.to_json(), status=200)
