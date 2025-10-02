@@ -1,8 +1,3 @@
-// -----------------------------
-// chart-combined.js
-// Полный объединённый скрипт: слева реальные данные, справа прогнозные
-// -----------------------------
-
 const chartCommonTimeLabels = ['-4 нед', '-3 нед', '-2 нед', '-1 нед', 'Сейчас', '+1 нед', '+2 нед', '+3 нед'];
 
 // --- Настройки URL ---
@@ -252,3 +247,4 @@ async function initializeCharts(){
 }
 
 document.addEventListener('DOMContentLoaded',initializeCharts);
+
