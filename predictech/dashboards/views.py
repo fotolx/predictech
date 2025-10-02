@@ -648,9 +648,6 @@ def forecast(request):
 
     # Сохранение результатов
     print("\n=== СОХРАНЕНИЕ РЕЗУЛЬТАТОВ ===")
-    # results_filename = 'forecast_results.csv'
-    # pred_df.to_csv(results_filename, index=False)
-    # print(f"Результаты сохранены в файл: {results_filename}")
     forecast = pred_df.round(2).sort_values('timestamp',ascending=False).loc[0]
     timestamp = forecast['timestamp']
     forecast['timestamp'] = str(timestamp)[:10] + " " + str(timestamp)[11:]  # Убираем миллисекунды из timestamp
@@ -661,5 +658,11 @@ def forecast(request):
         forecast_obj.save()
     except:
         Forecast.objects.create(timestamp=timestamp, house_id=house_obj, forecast=forecast.to_json())
+    try:
+        state_label_obj = StateLabel.objects.get(timestamp=timestamp, house_id=house_obj)
+        state_label_obj.state = forecast['state']
+        state_label_obj.save()
+    except:
+        StateLabel.objects.create(timestamp=timestamp, house_id=house_obj, state=forecast['state'])
 
     return HttpResponse(forecast.to_json(), status=200)
