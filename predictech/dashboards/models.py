@@ -90,7 +90,8 @@ class SavedModel(models.Model):
     name = models.CharField(max_length=100)
     description = models.TextField(default="", blank=True)
     accuracy = models.FloatField(default=0.0)
-    file = models.FileField(upload_to=user_directory_path, max_length=255)
+    model_file = models.FileField(upload_to=user_directory_path, max_length=255)
+    metadata_file = models.FileField(upload_to=user_directory_path, max_length=255)
     def __str__(self):
         return self.timestamp.__str__()+" - "+self.name
     
@@ -104,11 +105,20 @@ class ModelForHouse(models.Model):
         return self.name
 
 class StateLabel(models.Model):
-    STATES = {'normal':'Норма', 'sensor_failure':'Сбой датчика'}
+    STATES = {'normal':'Норма', 'sensor_failure':'Сбой датчика', 'gradual_leak':'Постепенная утечка', 'sharp_leak':'Утечка', 'unknown':''}
     timestamp = models.DateTimeField(default=timezone.now)
-    state = models.CharField(choices=STATES, default="", blank=True)
+    state = models.CharField(choices=STATES, default='unknown', blank=True)
     house_id = models.ForeignKey(House, null=False, blank=False, on_delete=models.CASCADE)
     name = models.CharField(max_length=100, default="", blank=True)
     description = models.TextField(default="", blank=True)
+    confidence = models.FloatField(default=0.0)
+    confirmed = models.BooleanField(default=False)
     def __str__(self):
         return self.house_id.__str__()+" - "+self.timestamp.__str__()+" - "+self.state
+    
+class Forecast(models.Model):
+    timestamp = models.DateTimeField(default=timezone.now)
+    house_id = models.ForeignKey(House, null=False, blank=False, on_delete=models.CASCADE)
+    forecast = models.CharField(max_length=1000, default="", blank=True)
+    def __str__(self):
+        return self.house_id.__str__()+" - "+self.timestamp.__str__()

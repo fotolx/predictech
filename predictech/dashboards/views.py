@@ -21,6 +21,7 @@ from django.conf import settings
 import time
 import pickle
 import os
+import joblib
 
 def home(request):
     return render(request, 'index.html')
@@ -155,6 +156,23 @@ class RealDataRetrainer:
         """Округление температурных значений до целых чисел"""
         return round(value) if pd.notnull(value) else value
 
+    def load_trained_model(self, model_path, metadata_path):
+        """Загружает обученную модель и метаданные"""
+        # Загружаем модель
+        self.model = tf.keras.models.load_model(model_path)
+
+        # Загружаем метаданные
+        with open(metadata_path, 'rb') as f:
+            metadata = pickle.load(f)
+
+        # Восстанавливаем все необходимые атрибуты
+        self.scaler = metadata['scaler']
+        self.label_encoder = metadata['label_encoder']
+        self.feature_columns = metadata['feature_columns']
+        self.sequence_length = metadata['sequence_length']
+
+        print(f"Модель загружена из: {model_path}")
+
     def create_features(self, df):
         """Создание признаков из реальных данных с контролем точности"""
         features = df.copy()
@@ -285,11 +303,12 @@ class RealDataRetrainer:
         self.execution_time = end_time - start_time
         return history, features
 
-    def save_retrained_model(self, base_path="retrained_models"):
+    def save_retrained_model(self, base_path="retrained_models", house_id=None):
         """Сохранение переобученной модели с датой в названии"""
         # Формирование имени файла с датой
         current_date = datetime.now().strftime("%Y%m%d_%H%M")
         model_filename = f"anomaly_model_retrained_{current_date}.keras"
+        metadata_filename = f"model_metadata_retrained_{current_date}.pkl"
 
         # Создание файла с информацией
         info_content = f"""Информация о переобученной модели:
@@ -304,16 +323,30 @@ class RealDataRetrainer:
       
         # Создание папки если не существует
         os.makedirs(os.path.join(settings.MEDIA_ROOT, base_path), exist_ok=True)
+        # Сохранение модели
         model_path = os.path.join(settings.MEDIA_ROOT, f"{base_path}/{model_filename}")
         self.model.save(model_path, overwrite=True)
+        # Сохранение метаданных
+        metadata_path = os.path.join(settings.MEDIA_ROOT, f"{base_path}/{metadata_filename}")
+        metadata = {
+            'scaler': self.scaler,
+            'label_encoder': self.label_encoder,
+            'feature_columns': self.feature_columns,
+            'sequence_length': self.sequence_length,
+            'retrain_date': current_date
+        }
+        with open(metadata_path, 'wb') as f:
+            pickle.dump(metadata, f)
+        # Сохранение информации о модели
         savedmodel = SavedModel.objects.create(
             timestamp=current_date,
             name=model_filename,
             description=info_content,
-            file=model_path,
+            model_file=model_path,
+            metadata_file=metadata_path,
             accuracy=self.test_accuracy
         )
-        house_obj = House.objects.get(id=self.house)
+        house_obj = House.objects.get(id=house_id)
         ModelForHouse.objects.create(house_id=house_obj, model_id=savedmodel, 
                                          name=model_filename, description=info_content, 
                                          timestamp=current_date)
@@ -330,7 +363,6 @@ def retrain_model(data, days_back=30, epochs=8, house_id=None):
             data=data,
             days_back=days_back, 
             epochs=epochs,
-            house=house_id 
         )
         # Сохранение модели
         result = retrainer.save_retrained_model(house_id=house_id)
@@ -374,7 +406,7 @@ def train_model(request):
         data = prepare_data(house, detectors_list, days_back=days_back)
         print(data)
         epochs=8
-        result = retrain_model(data, days_back=days_back, epochs=epochs, house=house)
+        result = retrain_model(data, days_back=days_back, epochs=epochs, house_id=house)
         return HttpResponse(f"{result}", status=200)
     
 def predict(request):
@@ -384,33 +416,239 @@ def predict(request):
         house = request.GET.get("house_id")
         try:
             saved_model = ModelForHouse.objects.get(house_id=house)
-            model = tf.keras.models.load_model(saved_model.model_id.file.path)
-            print(model)
+            model_file_path = saved_model.model_id.model_file.path
+            metadata_file_path = saved_model.model_id.metadata_file.path
         except Exception as e:
             return HttpResponse(f"Bad request. {e}", status=400)
-        
+
         detectors_list = DetectorsAtHouse.objects.filter(house_id=house)
         if not len(detectors_list):
             return HttpResponse("Bad request. No detectors.", status=400)
         data = prepare_data(house, detectors_list)
-        retrainer = RealDataRetrainer(sequence_length=12)
-        features = retrainer.create_features(data)
-
-        # print("\n🔍 Тестирование переобученной модели...")
-        if len(features) > retrainer.sequence_length:
+        predictor = RealDataRetrainer(sequence_length=12)
+        predictor.load_trained_model(model_file_path, metadata_file_path)
+        features = predictor.create_features(data)
+        # Получаем предсказание
+        if len(features) > predictor.sequence_length:
             demo_idx = len(features) - 1
-            demo_data = features.iloc[demo_idx-retrainer.sequence_length:demo_idx][retrainer.feature_columns].values
+            demo_data = features.iloc[demo_idx-predictor.sequence_length:demo_idx][predictor.feature_columns].values
 
-        #     # Получаем предсказание
-            prediction = model.model.predict(
-                demo_data.reshape(1, retrainer.sequence_length, -1), verbose=0
+            prediction = predictor.model.predict(
+                demo_data.reshape(1, predictor.sequence_length, -1), verbose=0
             )
-
-        #     # Обрабатываем предсказание
+            # Обрабатываем предсказание
             predicted_class = np.argmax(prediction[0])
-            predicted_label_name = retrainer.label_encoder.inverse_transform([predicted_class])[0]
+            predicted_label_name = predictor.label_encoder.inverse_transform([predicted_class])[0]
             confidence = np.max(prediction[0])
+            print(str(data['timestamp'].min()))
+            print(str(data['timestamp'].max()))
+            print(str(data['timestamp'].max()+timedelta(hours=1)))
+            print(f"🔮 Прогноз аномалии: {predicted_label_name}")
+            print(f"🎯 Уверенность: {confidence:.2%}")
+            try:
+                label = StateLabel.objects.get(house_id=house, timestamp=data['timestamp'].max()+timedelta(hours=1))
+                label.state = predicted_label_name
+                label.confidence = confidence
+                label.confirmed = False
+                label.save()
+            except:
+                StateLabel.objects.create(house_id=house, timestamp=data['timestamp'].max()+timedelta(hours=1), state=predicted_label_name, confidence=confidence)
+            return HttpResponse(f"Прогноз на {str(data['timestamp'].max()+timedelta(hours=1))}: {predicted_label_name} (уверенность: {confidence:.2%})", status=200)
+        else:
+            return HttpResponse(f"❌ Недостаточно данных для предсказания. Нужно {predictor.sequence_length}, есть {len(features)}", status=400)
+        
 
-            print(f"Пример предсказания: {predicted_label_name} (уверенность: {confidence:.2%})")
-    
-    return HttpResponse(f"Пример предсказания: {predicted_label_name} (уверенность: {confidence:.2%})", status=200)
+def forecast(request):
+    if request.method == 'GET':
+        if request.GET.get("house_id") is None:
+            return HttpResponse("Bad request", status=400)
+        house = request.GET.get("house_id")
+
+    # 1. Загрузка модели и метаданных
+    base_path="forecast"
+    model_filename =  os.path.join(settings.MEDIA_ROOT, f"{base_path}/{'fast_forecast_model.pkl'}")
+    metadata_filename = os.path.join(settings.MEDIA_ROOT, f"{base_path}/{'forecast_metadata.pkl'}")
+
+    # Загрузка модели и метаданных
+    try:
+        model = joblib.load(model_filename)
+        metadata = joblib.load(metadata_filename)
+        print("Модель и метаданные успешно загружены!")
+        print(f"Количество признаков: {metadata['feature_count']}")
+        print(f"Целевые переменные: {metadata['target_names']}")
+    except Exception as e:
+        print(f"Ошибка при загрузке модели: {e}")
+        # Если не удалось загрузить, создадим демонстрационную модель
+        print("Создание демонстрационной модели...")
+        from sklearn.ensemble import RandomForestRegressor
+        model = RandomForestRegressor()
+        # Для демонстрации создадим фиктивные метаданные
+        metadata = {
+            'feature_names': ['flow_xvs', 'flow_gvs', 'temp_supply', 'temp_return', 'imbalance',
+                            'imbalance_ratio', 'temp_difference', 'hour', 'day_of_week',
+                            'flow_xvs_mean_3h', 'flow_gvs_mean_3h', 'imbalance_mean_3h',
+                            'flow_xvs_diff_1h', 'flow_gvs_diff_1h', 'temp_supply_diff_1h',
+                            'temp_return_diff_1h', 'flow_xvs_diff_3h', 'flow_gvs_diff_3h',
+                            'temp_supply_diff_3h', 'temp_return_diff_3h'],
+            'target_names': ['flow_xvs_168', 'flow_gvs_168', 'temp_supply_168', 'temp_return_168',
+                            'flow_xvs_336', 'flow_gvs_336', 'temp_supply_336', 'temp_return_336',
+                            'flow_xvs_504', 'flow_gvs_504', 'temp_supply_504', 'temp_return_504'],
+            'forecast_horizons': [168, 336, 504]
+        }
+
+    # 2. Загрузка данных для прогноза
+    print("\n=== ЗАГРУЗКА ДАННЫХ ===")
+
+    # Функция для создания признаков (такая же, как при обучении)
+    def create_features_simple(df):
+        """Создание упрощенных признаков с округлением"""
+
+        df = df.copy()
+        df['timestamp'] = pd.to_datetime(df['timestamp'])
+        df = df.sort_values('timestamp').reset_index(drop=True)
+
+        features = pd.DataFrame()
+
+        # Базовые параметры
+        features['flow_xvs'] = df['flow_xvs']
+        features['flow_gvs'] = df['flow_gvs']
+        features['temp_supply'] = df['temp_supply']
+        features['temp_return'] = df['temp_return']
+
+        # Расчетные невязки с округлением
+        features['imbalance'] = round(features['flow_xvs'] - features['flow_gvs'], 2)
+        features['imbalance_ratio'] = round(1 - (features['flow_gvs'] / features['flow_xvs'].replace(0, 0.001)), 2)
+        features['temp_difference'] = round(features['temp_supply'] - features['temp_return'], 1)
+
+        # Временные признаки
+        features['hour'] = df['timestamp'].dt.hour
+        features['day_of_week'] = df['timestamp'].dt.dayofweek
+
+        # Основные статистические признаки (3 часа)
+        features['flow_xvs_mean_3h'] = round(df['flow_xvs'].rolling(window=3, min_periods=1).mean(), 2)
+        features['flow_gvs_mean_3h'] = round(df['flow_gvs'].rolling(window=3, min_periods=1).mean(), 2)
+        features['imbalance_mean_3h'] = round(features['imbalance'].rolling(window=3, min_periods=1).mean(), 2)
+
+        # Разности за 1 час
+        features['flow_xvs_diff_1h'] = round(df['flow_xvs'].diff(1), 2)
+        features['flow_gvs_diff_1h'] = round(df['flow_gvs'].diff(1), 2)
+        features['temp_supply_diff_1h'] = round(df['temp_supply'].diff(1), 1)
+        features['temp_return_diff_1h'] = round(df['temp_return'].diff(1), 1)
+
+        # Разности за 3 часа
+        features['flow_xvs_diff_3h'] = round(df['flow_xvs'].diff(3), 2)
+        features['flow_gvs_diff_3h'] = round(df['flow_gvs'].diff(3), 2)
+        features['temp_supply_diff_3h'] = round(df['temp_supply'].diff(3), 1)
+        features['temp_return_diff_3h'] = round(df['temp_return'].diff(3), 1)
+
+        # Заполнение NaN
+        features = features.fillna(method='bfill').fillna(method='ffill')
+
+        return features
+
+    # Загрузка данных
+    detectors_list = DetectorsAtHouse.objects.filter(house_id=house)
+    if not len(detectors_list):
+        return HttpResponse("Bad request. No detectors.", status=400)
+    data = prepare_data(house, detectors_list)
+    if not data.empty:
+        print(f"Данные загружены: {len(data)} строк")
+        # Создание признаков
+        features = create_features_simple(data)
+        # Проверяем, что все необходимые признаки присутствуют
+        missing_features = set(metadata['feature_names']) - set(features.columns)
+        if missing_features:
+            print(f"Предупреждение: отсутствуют признаки: {missing_features}")
+            # Оставляем только те признаки, которые есть в данных
+            available_features = [f for f in metadata['feature_names'] if f in features.columns]
+            features = features[available_features]
+        else:
+            features = features[metadata['feature_names']]
+
+        print(f"Признаки подготовлены: {features.shape}")
+    else:
+        # Создание демонстрационных данных
+        print("Создание демонстрационных данных...")
+        dates = pd.date_range(start=datetime.now() - timedelta(days=30), end=datetime.now(), freq='H')
+        demo_data = []
+        for date in dates:
+            demo_data.append({
+                'timestamp': date,
+                'flow_xvs': round(np.random.uniform(0.15, 0.25), 2),
+                'flow_gvs': round(np.random.uniform(0.14, 0.24), 2),
+                'temp_supply': round(np.random.uniform(59.0, 61.0), 1),
+                'temp_return': round(np.random.uniform(41.0, 43.0), 1),
+                'label': 'normal'
+            })
+        data = pd.DataFrame(demo_data)
+        features = create_features_simple(data)
+        features = features[metadata['feature_names']]
+        print(f"Демо-данные созданы: {features.shape}")
+
+    # 3. Выполнение прогноза
+    print("\n=== ВЫПОЛНЕНИЕ ПРОГНОЗА ===")
+
+    # Прогнозирование
+    predictions = model.predict(features)
+
+    # Преобразование в DataFrame для удобства
+    pred_df = pd.DataFrame(predictions, columns=metadata['target_names'])
+
+    # Добавляем временные метки
+    pred_df['timestamp'] = data['timestamp'].values
+    # 4. Вывод первых пяти строк результатов
+    print("\n=== ПЕРВЫЕ 5 СТРОК РЕЗУЛЬТАТОВ ПРОГНОЗА ===")
+
+    # Форматируем вывод для лучшей читаемости
+    pd.set_option('display.max_columns', None)
+    pd.set_option('display.width', 1000)
+    response_str = ""
+    # Создаем красивый вывод для первых 5 строк
+    for i in range(min(5, len(pred_df))):
+        print(f"\n--- Строка {i+1} ---")
+        print(f"Время: {pred_df.iloc[i]['timestamp']}")
+        response_str = response_str+f"\n--- Строка {i+1} ---\n"+f"Время: {pred_df.iloc[i]['timestamp']}\n"
+        # Прогноз на 1 неделю (168 часов)
+        print("Прогноз на 1 неделю:")
+        print(f"  flow_xvs: {pred_df.iloc[i]['flow_xvs_168']:.3f}")
+        print(f"  flow_gvs: {pred_df.iloc[i]['flow_gvs_168']:.3f}")
+        print(f"  temp_supply: {pred_df.iloc[i]['temp_supply_168']:.1f}°C")
+        print(f"  temp_return: {pred_df.iloc[i]['temp_return_168']:.1f}°C")
+        response_str = response_str+"Прогноз на 1 неделю:\n"+f"  flow_xvs: {pred_df.iloc[i]['flow_xvs_168']:.3f}\n"+f"  flow_gvs: {pred_df.iloc[i]['flow_gvs_168']:.3f}\n"+f"  temp_supply: {pred_df.iloc[i]['temp_supply_168']:.1f}°C\n"+f"  temp_return: {pred_df.iloc[i]['temp_return_168']:.1f}°C\n"
+
+        # Прогноз на 2 недели (336 часов)
+        print("Прогноз на 2 недели:")
+        print(f"  flow_xvs: {pred_df.iloc[i]['flow_xvs_336']:.3f}")
+        print(f"  flow_gvs: {pred_df.iloc[i]['flow_gvs_336']:.3f}")
+        print(f"  temp_supply: {pred_df.iloc[i]['temp_supply_336']:.1f}°C")
+        print(f"  temp_return: {pred_df.iloc[i]['temp_return_336']:.1f}°C")
+
+        # Прогноз на 3 недели (504 часов)
+        print("Прогноз на 3 недели:")
+        print(f"  flow_xvs: {pred_df.iloc[i]['flow_xvs_504']:.3f}")
+        print(f"  flow_gvs: {pred_df.iloc[i]['flow_gvs_504']:.3f}")
+        print(f"  temp_supply: {pred_df.iloc[i]['temp_supply_504']:.1f}°C")
+        print(f"  temp_return: {pred_df.iloc[i]['temp_return_504']:.1f}°C")
+
+    # 5. Дополнительная информация
+    print("\n=== СВОДНАЯ ИНФОРМАЦИЯ ===")
+    print(f"Всего выполнено прогнозов: {len(pred_df)}")
+    print(f"Диапазон дат в данных: {data['timestamp'].min()} - {data['timestamp'].max()}")
+
+    # Сохранение результатов
+    print("\n=== СОХРАНЕНИЕ РЕЗУЛЬТАТОВ ===")
+    # results_filename = 'forecast_results.csv'
+    # pred_df.to_csv(results_filename, index=False)
+    # print(f"Результаты сохранены в файл: {results_filename}")
+    forecast = pred_df.round(2).sort_values('timestamp',ascending=False).loc[0]
+    timestamp = forecast['timestamp']
+    forecast['timestamp'] = str(timestamp)[:10] + " " + str(timestamp)[11:]  # Убираем миллисекунды из timestamp
+    house_obj = House.objects.get(id=house)
+    try:
+        forecast_obj = Forecast.objects.get(timestamp=timestamp, house_id=house_obj)
+        forecast_obj.forecast = forecast.to_json()
+        forecast_obj.save()
+    except:
+        Forecast.objects.create(timestamp=timestamp, house_id=house_obj, forecast=forecast.to_json())
+
+    return HttpResponse(forecast.to_json(), status=200)

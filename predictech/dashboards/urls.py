@@ -16,4 +16,5 @@ urlpatterns = [
     path('train_model/', train_model, name='train_model'),
     path('predict/', predict, name='predict'),
     path('house/', HouseView.as_view(), name='house'),
+    path('forecast/', forecast, name='forecast'),
 ]

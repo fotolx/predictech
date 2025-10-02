@@ -36,5 +36,7 @@ class ModelForHouseAdmin(admin.ModelAdmin):
 class StateLabelAdmin(admin.ModelAdmin):
     list_display = ("timestamp", "state", "house_id",)
     pass
+class ForecastAdmin(admin.ModelAdmin):
+    pass
 
 admin_register(namespace=globals())
