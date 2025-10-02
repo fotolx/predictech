@@ -1,3 +1,9 @@
+// -----------------------------
+// Скрипт: исторические данные + прогнозы
+// Жесткая привязка по detector_id для chart1 и chart2
+// Прогнозные значения расхода умножаем на 1000
+// -----------------------------
+
 const chartCommonTimeLabels = ['-4 нед', '-3 нед', '-2 нед', '-1 нед', 'Сейчас', '+1 нед', '+2 нед', '+3 нед'];
 const REAL_DATA_URL = 'https://predictech.5d4.ru/detector_data_log/';
 const FORECAST_URL = 'https://predictech.5d4.ru/forecast/?house_id=2';
