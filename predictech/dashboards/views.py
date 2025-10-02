@@ -455,7 +455,7 @@ def predict(request):
             print(str(data['timestamp'].max()+timedelta(hours=1)))
             print(f"🔮 Прогноз аномалии: {predicted_label_name}")
             print(f"🎯 Уверенность: {confidence:.2%}")
-            house_obj = House.objects.get(house_id=house)
+            house_obj = House.objects.get(id=house)
             try:
                 label = StateLabel.objects.get(house_id=house_obj, timestamp=data['timestamp'].max()+timedelta(hours=1))
                 label.state = predicted_label_name
