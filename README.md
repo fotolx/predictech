@@ -16,6 +16,23 @@ PASSWORD = 'password'
 HOST = '127.0.0.1'
 PORT = 5432
 ```
+Создание секретного ключа Django в командной строке:
+```
+python3 -c 'from django.core.management.utils import get_random_secret_key; print(get_random_secret_key())'
+```
+
+Рекомендуется использовать предоставленную выгрузку базы данных для первоначального заполнения.
+Для запуска на пустой базе данных понадобятся команды:
+```
+python3 manage.py makemigrations
+python3 manage.py migrate
+python3 manage.py createsuperuser
+```
+Если возникает ошибка при создании суперпользователя, выполнить следующую команду:
+```
+python3 manage.py migrate --run-syncdb
+```
+
 3. Создать контейнер
 ```
 docker-compose build

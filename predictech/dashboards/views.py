@@ -22,6 +22,7 @@ import time
 import pickle
 import os
 import joblib
+import json
 
 def home(request):
     return render(request, 'index.html')
@@ -361,7 +362,16 @@ class RealDataRetrainer:
                                          name=model_filename, description=info_content, 
                                          timestamp=current_date)
         print(f"\n✅ Модель успешно переобучена и сохранена!")
-        return "Модель успешно переобучена и сохранена!"
+        result = {
+            "status": "Success",
+            "message": "Модель успешно переобучена и сохранена!",
+            "sequence_length": self.sequence_length,
+            "retrain_date": current_date,
+            "test_accuracy": self.test_accuracy,
+            "test_loss": self.test_loss,
+            "execution_time": self.execution_time
+        }
+        return json.dumps(result)
 
 
 def retrain_model(data, days_back=30, epochs=8, house_id=None):
@@ -380,7 +390,7 @@ def retrain_model(data, days_back=30, epochs=8, house_id=None):
 
     except Exception as e:
         print(f"❌ Ошибка при переобучении: {e}")
-        return f"Ошибка при переобучении: {e}"
+        return json.dumps({"status": "Error", "message": str(e)})
 
 def prepare_data(house, detectors_list, days_back=30):
     data = pd.DataFrame()
@@ -412,7 +422,7 @@ def train_model(request):
         days_back=30
         detectors_list = DetectorsAtHouse.objects.filter(house_id=house)
         if not len(detectors_list):
-            return HttpResponse("Bad request. No detectors", status=400)
+            return HttpResponse(json.dumps({"status": "Error", "message": "Bad request. No detectors"}), status=400)
         data = prepare_data(house, detectors_list, days_back=days_back)
         print(data)
         epochs=8
