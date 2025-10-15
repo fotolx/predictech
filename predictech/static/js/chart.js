@@ -1,9 +1,3 @@
-// -----------------------------
-// Скрипт: исторические данные + прогнозы
-// Жесткая привязка по detector_id для chart1 и chart2
-// Прогнозные значения расхода умножаем на 1000
-// -----------------------------
-
 const chartCommonTimeLabels = ['-4 нед', '-3 нед', '-2 нед', '-1 нед', 'Сейчас', '+1 нед', '+2 нед', '+3 нед'];
 const REAL_DATA_URL = 'https://predictech.5d4.ru/detector_data_log/';
 const FORECAST_URL = 'https://predictech.5d4.ru/forecast/?house_id=2';
@@ -225,8 +219,6 @@ async function initializeCharts(){
     createChart('chart4',[...dsT1,...dsT2,avgDataset],'temp');
 
     const infoDiv=document.createElement('div');
-    infoDiv.style='color:#6b7280;text-align:center;padding:10px;font-size:12px;font-style:italic;';
-    infoDiv.textContent='Данные справа от вертикальной линии являются прогнозными и обновляются регулярно';
     document.body.prepend(infoDiv);
 
     console.log('Графики успешно инициализированы');

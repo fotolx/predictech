@@ -7,6 +7,8 @@
 
   .chart-container {
       width: calc(50% - 16px);
+      height: 236px;
+      margin: 24px 0 0 0;
   }
 
   .chart-title {
@@ -20,7 +22,7 @@
   .time-periods {
       display: flex;
       justify-content: space-between;
-      margin: 0 0 24px 0;
+      margin: 0 0 0px 0;
   }
 
   .time-periods__title {
@@ -42,6 +44,8 @@
       font-size: 12px;
       border: none;
       background: transparent;
+      box-sizing: border-box;
+      padding: 4px 12px;
       border-radius: 6px 6px;
       transition: background .25s ease-in-out;
       cursor: pointer;
@@ -50,8 +54,6 @@
   .time-period--active {
       font-weight: 500;
       line-height: 133%;
-      box-sizing: border-box;
-      padding: 4px 12px;
       background: var(--bs-body-bg);
       color: #000;
       box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
@@ -62,7 +64,7 @@
   }
 
   .time-period:not(:last-child) {
-      margin: 0 12px 0 0;
+      margin: 0 4px 0 0;
   }
 
   .wrapper-allert-risk {
