@@ -67,7 +67,7 @@ async function checkAIStatus() {
         const data = await loadDataViaProxy(`${UPDATE_CONFIG.jsonUrl}&t=${Date.now()}`);
 
         if (data.status === "Success" && !modelTrainedShown) {
-            modelTrainedShown = true; // ✅ защита от повторов
+            modelTrainedShown = true; // защита от повторов
             clearInterval(checkInterval);
             updatePageData(data);
             showSuccessModal(data);
@@ -245,3 +245,4 @@ window.UpdateManager = {
     resetUpdateButtons,
     removeModalConfirmActive
 };
+
