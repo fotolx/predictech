@@ -1,23 +1,15 @@
 // === Конфигурация ===
 const UPDATE_CONFIG = {
     jsonUrl: 'https://predictech.5d4.ru/train_model/?house_id=2',
-    checkInterval: 2000, // Проверять каждые 2 секунды
-    maxAttempts: 30, // Максимум 1 минута
-    startDelay: 5500 // Задержка перед первым запросом (5.5 сек)
+    startDelay: 5500, // Задержка перед запросом (5.5 сек)
+    checkInterval: 2000,
+    maxAttempts: 30
 };
 
-// === Прокси для обхода CORS ===
-const PROXIES = [
-    'https://corsproxy.io/?',
-    'https://api.codetabs.com/v1/proxy?quest=',
-    'https://proxy.cors.sh/',
-    'https://cors-anywhere.herokuapp.com/'
-];
-
 // === Глобальные переменные ===
-let checkInterval = null;
-let checkAttempts = 0;
-let modelTrainedShown = false;
+let checkTimer = null;
+let attempts = 0;
+let modelShown = false;
 
 // === Инициализация ===
 document.addEventListener('DOMContentLoaded', () => {
@@ -31,131 +23,118 @@ document.addEventListener('DOMContentLoaded', () => {
 function initUpdateButtons() {
     const buttons = document.querySelectorAll('.btn-update');
     if (!buttons.length) {
-        console.warn('Кнопки .btn-update не найдены, повтор через 500 мс');
         return setTimeout(initUpdateButtons, 500);
     }
 
-    buttons.forEach(button => {
-        button.addEventListener('click', handleUpdateClick);
+    buttons.forEach(btn => {
+        btn.addEventListener('click', handleClick);
     });
-    console.log('Update buttons инициализированы');
 }
 
 // === Обработчик клика ===
-function handleUpdateClick(e) {
-    const button = e.currentTarget;
-    button.disabled = true;
-    button.textContent = 'Ожидание запроса...';
-    modelTrainedShown = false;
+function handleClick(e) {
+    const btn = e.currentTarget;
+    btn.disabled = true;
+    btn.textContent = 'Ожидание запроса...';
+    modelShown = false;
 
-    console.log(`Отправка запроса начнется через ${UPDATE_CONFIG.startDelay / 1000} секунд...`);
+    console.log(`Запрос начнется через ${UPDATE_CONFIG.startDelay / 1000} секунд`);
 
-    // Запуск проверки через 5.5 секунд
     setTimeout(() => {
-        button.textContent = 'Проверка...';
-        startStatusCheck();
+        btn.textContent = 'Проверка...';
+        startCheck();
     }, UPDATE_CONFIG.startDelay);
 }
 
-// === Проверка статуса модели ===
-function startStatusCheck() {
-    checkAttempts = 0;
-    clearInterval(checkInterval);
+// === Старт проверки ===
+function startCheck() {
+    attempts = 0;
+    clearInterval(checkTimer);
+    checkStatus(); // первый запрос сразу
 
-    // Сразу делаем первый запрос
-    checkAIStatus();
-
-    // Далее — каждые 2 секунды
-    checkInterval = setInterval(() => {
-        checkAIStatus();
-    }, UPDATE_CONFIG.checkInterval);
+    checkTimer = setInterval(checkStatus, UPDATE_CONFIG.checkInterval);
 }
 
-// === Запрос статуса ===
-async function checkAIStatus() {
-    try {
-        checkAttempts++;
-        const data = await loadDataViaProxy(`${UPDATE_CONFIG.jsonUrl}&t=${Date.now()}`);
+// === Запрос к серверу ===
+async function checkStatus() {
+    attempts++;
 
-        if (data.status === "Success" && !modelTrainedShown) {
-            modelTrainedShown = true;
-            clearInterval(checkInterval);
+    try {
+        const response = await fetch(`${UPDATE_CONFIG.jsonUrl}&t=${Date.now()}`, {
+            headers: { 'Accept': 'application/json' },
+            cache: 'no-store'
+        });
+
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+        // Быстрое чтение и парсинг JSON
+        const dataText = await response.text();
+        const data = fastParseJSON(dataText);
+
+        if (data.status === "Success" && !modelShown) {
+            modelShown = true;
+            clearInterval(checkTimer);
             updatePageData(data);
             showSuccessModal(data);
-            resetUpdateButtons();
+            resetButtons();
         } else if (data.status === "Error") {
-            clearInterval(checkInterval);
+            clearInterval(checkTimer);
             showErrorModal(data);
-            resetUpdateButtons();
-        } else if (checkAttempts >= UPDATE_CONFIG.maxAttempts) {
-            clearInterval(checkInterval);
+            resetButtons();
+        } else if (attempts >= UPDATE_CONFIG.maxAttempts) {
+            clearInterval(checkTimer);
             showTimeoutModal();
-            resetUpdateButtons();
+            resetButtons();
         }
     } catch (err) {
-        console.error('Ошибка при загрузке данных:', err);
-        clearInterval(checkInterval);
+        console.error('Ошибка загрузки:', err);
+        clearInterval(checkTimer);
         showErrorModal({ message: 'Ошибка загрузки данных' });
-        resetUpdateButtons();
+        resetButtons();
     }
 }
 
-// === Загрузка данных через прокси ===
-async function loadDataViaProxy(targetUrl) {
-    for (const proxy of PROXIES) {
-        try {
-            const response = await fetch(proxy + encodeURIComponent(targetUrl), { headers: { 'Accept': 'application/json' } });
-            if (!response.ok) throw new Error(`HTTP ${response.status}`);
-            const text = await response.text();
-            return processServerData(text);
-        } catch (err) {
-            console.warn(`Прокси ${proxy} не сработал: ${err.message}`);
-        }
-    }
-    throw new Error('Все прокси не сработали');
-}
-
-// === Парсинг ответа сервера ===
-function processServerData(text) {
-    const cleaned = text.trim();
+// === Ускоренный парсер JSON ===
+function fastParseJSON(text) {
     try {
-        return JSON.parse(cleaned);
+        return JSON.parse(text);
     } catch {
-        const match = cleaned.match(/\{[\s\S]*\}|\[[\s\S]*\]/);
-        if (match) return JSON.parse(match[0]);
+        // Очищаем возможный мусор до и после JSON
+        const start = text.indexOf('{');
+        const end = text.lastIndexOf('}');
+        if (start !== -1 && end !== -1) {
+            return JSON.parse(text.slice(start, end + 1));
+        }
         throw new Error('Не удалось распарсить ответ');
     }
 }
 
-// === Обновление данных на странице ===
+// === Обновление DOM ===
 function updatePageData(data) {
+    const dateEls = document.querySelectorAll('.last-training-date');
+    const accEls = document.querySelectorAll('.model-accuracy-value');
+    const impEls = document.querySelectorAll('.accuracy-improvement-value');
+
     if (data.retrain_date) {
         const formatted = formatDate(data.retrain_date);
-        document.querySelectorAll('.last-training-date').forEach(el => el.textContent = formatted);
+        dateEls.forEach(el => (el.textContent = formatted));
     }
-
     if (data.test_accuracy !== undefined) {
         const percent = (data.test_accuracy * 100).toFixed(1) + '%';
-        document.querySelectorAll('.model-accuracy-value').forEach(el => el.textContent = percent);
+        accEls.forEach(el => (el.textContent = percent));
     }
-
     if (data.test_loss !== undefined) {
         const value = formatImprovementValue(data.test_loss);
-        document.querySelectorAll('.accuracy-improvement-value').forEach(el => el.textContent = value);
+        impEls.forEach(el => (el.textContent = value));
     }
 
     console.log('Обновлены данные модели:', data);
 }
 
-// === Форматирование значений ===
+// === Вспомогательные функции ===
 function formatDate(str) {
     try {
-        const year = str.substring(0, 4);
-        const month = str.substring(4, 6);
-        const day = str.substring(6, 8);
-        const hour = str.substring(9, 11);
-        const minute = str.substring(11, 13);
-        return `${day}.${month}.${year}, ${hour}:${minute}`;
+        return `${str.substring(6, 8)}.${str.substring(4, 6)}.${str.substring(0, 4)}, ${str.substring(9, 11)}:${str.substring(11, 13)}`;
     } catch {
         return str;
     }
@@ -168,74 +147,61 @@ function formatImprovementValue(v) {
 
 // === Модалки ===
 function showSuccessModal(data) {
-    createAndShowModal('success', decodeUnicode(data.message || 'Модель успешно обучена!'));
+    createModal('success', decodeUnicode(data.message || 'Модель успешно обучена!'));
 }
-
 function showErrorModal(data) {
-    createAndShowModal('error', data.message || 'Ошибка обучения');
+    createModal('error', data.message || 'Ошибка обучения');
 }
-
 function showTimeoutModal() {
-    createAndShowModal('error', 'Превышено время ожидания ответа');
+    createModal('error', 'Превышено время ожидания ответа');
 }
 
-function createAndShowModal(type, message) {
+function createModal(type, message) {
     document.querySelectorAll('.update-model').forEach(m => m.remove());
 
     const isSuccess = type === 'success';
-    const iconSrc = isSuccess ? '/static/img/icon/check-4.svg' : '/static/img/icon/error.svg';
-    const modalHTML = `
+    const icon = isSuccess ? '/static/img/icon/check-4.svg' : '/static/img/icon/error.svg';
+    const html = `
         <div class="update-model">
             <div class="container-update-model">
                 <div class="update-model__content">
-                    <div class="close-update-model">
-                        <img src="/static/img/icon/close-line.svg" alt="Закрыть">
-                    </div>
-                    <div class="circle-update ${isSuccess ? '' : 'error'}">
-                        <img src="${iconSrc}" alt="">
-                    </div>
+                    <div class="close-update-model"><img src="/static/img/icon/close-line.svg" alt="Закрыть"></div>
+                    <div class="circle-update ${isSuccess ? '' : 'error'}"><img src="${icon}" alt=""></div>
                     <div class="update-model__title">${message}</div>
                 </div>
             </div>
-        </div>
-    `;
-    document.body.insertAdjacentHTML('beforeend', modalHTML);
+        </div>`;
+    document.body.insertAdjacentHTML('beforeend', html);
 
     const modal = document.querySelector('.update-model:last-child');
     initModalEvents(modal);
     removeModalConfirmActive();
 }
 
-// === Утилиты ===
 function decodeUnicode(str) {
-    return str.replace(/\\u[\dA-F]{4}/gi, match =>
-        String.fromCharCode(parseInt(match.replace(/\\u/g, ''), 16))
-    );
+    return str.replace(/\\u[\dA-F]{4}/gi, m => String.fromCharCode(parseInt(m.replace(/\\u/g, ''), 16)));
 }
 
-function resetUpdateButtons() {
-    document.querySelectorAll('.btn-update').forEach(button => {
-        button.disabled = false;
-        button.textContent = button.getAttribute('data-original-text') || 'Обновить';
+function resetButtons() {
+    document.querySelectorAll('.btn-update').forEach(btn => {
+        btn.disabled = false;
+        btn.textContent = btn.dataset.originalText || 'Обновить';
+    });
+}
+
+function saveOriginalButtonTexts() {
+    document.querySelectorAll('.btn-update').forEach(btn => {
+        if (!btn.dataset.originalText) btn.dataset.originalText = btn.textContent;
     });
 }
 
 function removeModalConfirmActive() {
-    const modalConfirm = document.querySelector('.modal-confirm.modal-confirm-open.modal-confirm--active');
-    if (modalConfirm) modalConfirm.classList.remove('modal-confirm--active');
-}
-
-function saveOriginalButtonTexts() {
-    document.querySelectorAll('.btn-update').forEach(button => {
-        if (!button.getAttribute('data-original-text')) {
-            button.setAttribute('data-original-text', button.textContent);
-        }
-    });
+    const m = document.querySelector('.modal-confirm.modal-confirm-open.modal-confirm--active');
+    if (m) m.classList.remove('modal-confirm--active');
 }
 
 function initModalEvents(modal) {
-    const closeBtn = modal.querySelector('.close-update-model');
-    closeBtn.addEventListener('click', () => modal.remove());
+    modal.querySelector('.close-update-model').addEventListener('click', () => modal.remove());
     modal.addEventListener('click', e => { if (e.target === modal) modal.remove(); });
     document.addEventListener('keydown', function escClose(e) {
         if (e.key === 'Escape') {
@@ -247,10 +213,9 @@ function initModalEvents(modal) {
 
 // === Экспорт ===
 window.UpdateManager = {
-    checkAIStatus,
+    checkStatus,
     updatePageData,
     showSuccessModal,
     showErrorModal,
-    resetUpdateButtons,
-    removeModalConfirmActive
+    resetButtons
 };
