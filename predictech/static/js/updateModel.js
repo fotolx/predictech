@@ -245,5 +245,3 @@ window.UpdateManager = {
     resetUpdateButtons,
     removeModalConfirmActive
 };
-
-
