@@ -2,7 +2,8 @@
 const UPDATE_CONFIG = {
     jsonUrl: 'https://predictech.5d4.ru/train_model/?house_id=2',
     checkInterval: 2000, // Проверять каждые 2 секунды
-    maxAttempts: 30 // Максимум 1 минута
+    maxAttempts: 30, // Максимум 1 минута
+    startDelay: 5500 // Задержка перед первым запросом (5.5 сек)
 };
 
 // === Прокси для обхода CORS ===
@@ -16,7 +17,7 @@ const PROXIES = [
 // === Глобальные переменные ===
 let checkInterval = null;
 let checkAttempts = 0;
-let modelTrainedShown = false; // <-- защита от повторных показов модалки
+let modelTrainedShown = false;
 
 // === Инициализация ===
 document.addEventListener('DOMContentLoaded', () => {
@@ -44,10 +45,16 @@ function initUpdateButtons() {
 function handleUpdateClick(e) {
     const button = e.currentTarget;
     button.disabled = true;
-    button.textContent = 'Проверка...';
-    modelTrainedShown = false; // сброс перед новой проверкой
+    button.textContent = 'Ожидание запроса...';
+    modelTrainedShown = false;
 
-    startStatusCheck();
+    console.log(`Отправка запроса начнется через ${UPDATE_CONFIG.startDelay / 1000} секунд...`);
+
+    // Запуск проверки через 5.5 секунд
+    setTimeout(() => {
+        button.textContent = 'Проверка...';
+        startStatusCheck();
+    }, UPDATE_CONFIG.startDelay);
 }
 
 // === Проверка статуса модели ===
@@ -55,6 +62,10 @@ function startStatusCheck() {
     checkAttempts = 0;
     clearInterval(checkInterval);
 
+    // Сразу делаем первый запрос
+    checkAIStatus();
+
+    // Далее — каждые 2 секунды
     checkInterval = setInterval(() => {
         checkAIStatus();
     }, UPDATE_CONFIG.checkInterval);
@@ -67,7 +78,7 @@ async function checkAIStatus() {
         const data = await loadDataViaProxy(`${UPDATE_CONFIG.jsonUrl}&t=${Date.now()}`);
 
         if (data.status === "Success" && !modelTrainedShown) {
-            modelTrainedShown = true; // защита от повторов
+            modelTrainedShown = true;
             clearInterval(checkInterval);
             updatePageData(data);
             showSuccessModal(data);
@@ -81,7 +92,6 @@ async function checkAIStatus() {
             showTimeoutModal();
             resetUpdateButtons();
         }
-        // если статус Pending — просто ждем
     } catch (err) {
         console.error('Ошибка при загрузке данных:', err);
         clearInterval(checkInterval);
@@ -170,7 +180,6 @@ function showTimeoutModal() {
 }
 
 function createAndShowModal(type, message) {
-    // удалить предыдущие модалки, если остались
     document.querySelectorAll('.update-model').forEach(m => m.remove());
 
     const isSuccess = type === 'success';
@@ -236,7 +245,7 @@ function initModalEvents(modal) {
     });
 }
 
-// === Экспорт для внешнего вызова ===
+// === Экспорт ===
 window.UpdateManager = {
     checkAIStatus,
     updatePageData,
@@ -245,4 +254,3 @@ window.UpdateManager = {
     resetUpdateButtons,
     removeModalConfirmActive
 };
-
