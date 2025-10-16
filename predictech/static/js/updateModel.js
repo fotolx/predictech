@@ -11,10 +11,16 @@ let checkTimer = null;
 let attempts = 0;
 let modelShown = false;
 
+// === Ключи для localStorage ===
+const STORAGE_KEYS = {
+    date: 'lastTrainingDate',
+    accuracy: 'modelAccuracyValue',
+    improvement: 'accuracyImprovementValue'
+};
+
 // === Инициализация ===
 document.addEventListener('DOMContentLoaded', () => {
-    loadStoredData(); // Загружаем данные из localStorage при старте
-
+    restoreFromLocalStorage();
     setTimeout(() => {
         saveOriginalButtonTexts();
         initUpdateButtons();
@@ -27,6 +33,7 @@ function initUpdateButtons() {
     if (!buttons.length) {
         return setTimeout(initUpdateButtons, 500);
     }
+
     buttons.forEach(btn => {
         btn.addEventListener('click', handleClick);
     });
@@ -58,6 +65,7 @@ function startCheck() {
 // === Запрос к серверу ===
 async function checkStatus() {
     attempts++;
+
     try {
         const response = await fetch(`${UPDATE_CONFIG.jsonUrl}&t=${Date.now()}`, {
             headers: { 'Accept': 'application/json' },
@@ -73,7 +81,7 @@ async function checkStatus() {
             modelShown = true;
             clearInterval(checkTimer);
             updatePageData(data);
-            saveDataToLocal(data); // 💾 Сохраняем данные в localStorage
+            saveToLocalStorage(data);
             showSuccessModal(data);
             resetButtons();
         } else if (data.status === "Error") {
@@ -129,28 +137,27 @@ function updatePageData(data) {
     console.log('Обновлены данные модели:', data);
 }
 
-// === Сохранение и загрузка из localStorage ===
-function saveDataToLocal(data) {
-    const stored = {
-        retrain_date: data.retrain_date || null,
-        test_accuracy: data.test_accuracy || null,
-        test_loss: data.test_loss || null
-    };
-    localStorage.setItem('modelData', JSON.stringify(stored));
-    console.log('✅ Данные сохранены в localStorage');
+// === LocalStorage ===
+function saveToLocalStorage(data) {
+    if (data.retrain_date) {
+        localStorage.setItem(STORAGE_KEYS.date, formatDate(data.retrain_date));
+    }
+    if (data.test_accuracy !== undefined) {
+        localStorage.setItem(STORAGE_KEYS.accuracy, (data.test_accuracy * 100).toFixed(1) + '%');
+    }
+    if (data.test_loss !== undefined) {
+        localStorage.setItem(STORAGE_KEYS.improvement, formatImprovementValue(data.test_loss));
+    }
 }
 
-function loadStoredData() {
-    const stored = localStorage.getItem('modelData');
-    if (!stored) return;
+function restoreFromLocalStorage() {
+    const date = localStorage.getItem(STORAGE_KEYS.date);
+    const acc = localStorage.getItem(STORAGE_KEYS.accuracy);
+    const imp = localStorage.getItem(STORAGE_KEYS.improvement);
 
-    try {
-        const data = JSON.parse(stored);
-        updatePageData(data);
-        console.log('📦 Загружены данные из localStorage');
-    } catch (err) {
-        console.error('Ошибка загрузки из localStorage:', err);
-    }
+    if (date) document.querySelectorAll('.last-training-date').forEach(el => el.textContent = date);
+    if (acc) document.querySelectorAll('.model-accuracy-value').forEach(el => el.textContent = acc);
+    if (imp) document.querySelectorAll('.accuracy-improvement-value').forEach(el => el.textContent = imp);
 }
 
 // === Вспомогательные функции ===
