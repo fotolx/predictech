@@ -13,6 +13,8 @@ let modelShown = false;
 
 // === Инициализация ===
 document.addEventListener('DOMContentLoaded', () => {
+    loadStoredData(); // Загружаем данные из localStorage при старте
+
     setTimeout(() => {
         saveOriginalButtonTexts();
         initUpdateButtons();
@@ -25,7 +27,6 @@ function initUpdateButtons() {
     if (!buttons.length) {
         return setTimeout(initUpdateButtons, 500);
     }
-
     buttons.forEach(btn => {
         btn.addEventListener('click', handleClick);
     });
@@ -51,14 +52,12 @@ function startCheck() {
     attempts = 0;
     clearInterval(checkTimer);
     checkStatus(); // первый запрос сразу
-
     checkTimer = setInterval(checkStatus, UPDATE_CONFIG.checkInterval);
 }
 
 // === Запрос к серверу ===
 async function checkStatus() {
     attempts++;
-
     try {
         const response = await fetch(`${UPDATE_CONFIG.jsonUrl}&t=${Date.now()}`, {
             headers: { 'Accept': 'application/json' },
@@ -67,7 +66,6 @@ async function checkStatus() {
 
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
 
-        // Быстрое чтение и парсинг JSON
         const dataText = await response.text();
         const data = fastParseJSON(dataText);
 
@@ -75,6 +73,7 @@ async function checkStatus() {
             modelShown = true;
             clearInterval(checkTimer);
             updatePageData(data);
+            saveDataToLocal(data); // 💾 Сохраняем данные в localStorage
             showSuccessModal(data);
             resetButtons();
         } else if (data.status === "Error") {
@@ -99,7 +98,6 @@ function fastParseJSON(text) {
     try {
         return JSON.parse(text);
     } catch {
-        // Очищаем возможный мусор до и после JSON
         const start = text.indexOf('{');
         const end = text.lastIndexOf('}');
         if (start !== -1 && end !== -1) {
@@ -129,6 +127,30 @@ function updatePageData(data) {
     }
 
     console.log('Обновлены данные модели:', data);
+}
+
+// === Сохранение и загрузка из localStorage ===
+function saveDataToLocal(data) {
+    const stored = {
+        retrain_date: data.retrain_date || null,
+        test_accuracy: data.test_accuracy || null,
+        test_loss: data.test_loss || null
+    };
+    localStorage.setItem('modelData', JSON.stringify(stored));
+    console.log('✅ Данные сохранены в localStorage');
+}
+
+function loadStoredData() {
+    const stored = localStorage.getItem('modelData');
+    if (!stored) return;
+
+    try {
+        const data = JSON.parse(stored);
+        updatePageData(data);
+        console.log('📦 Загружены данные из localStorage');
+    } catch (err) {
+        console.error('Ошибка загрузки из localStorage:', err);
+    }
 }
 
 // === Вспомогательные функции ===
