@@ -174,13 +174,13 @@ function createAndShowModal(type, message) {
     document.querySelectorAll('.update-model').forEach(m => m.remove());
 
     const isSuccess = type === 'success';
-    const iconSrc = isSuccess ? 'img/icon/check-4.svg' : 'img/icon/error.svg';
+    const iconSrc = isSuccess ? '/img/icon/check-4.svg' : '/img/icon/error.svg';
     const modalHTML = `
         <div class="update-model">
             <div class="container-update-model">
                 <div class="update-model__content">
                     <div class="close-update-model">
-                        <img src="img/icon/close-line.svg" alt="Закрыть">
+                        <img src="/img/icon/close-line.svg" alt="Закрыть">
                     </div>
                     <div class="circle-update ${isSuccess ? '' : 'error'}">
                         <img src="${iconSrc}" alt="">
@@ -245,4 +245,5 @@ window.UpdateManager = {
     resetUpdateButtons,
     removeModalConfirmActive
 };
+
 
