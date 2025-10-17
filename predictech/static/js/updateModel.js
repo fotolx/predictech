@@ -1,7 +1,7 @@
 // === Конфигурация ===
 const UPDATE_CONFIG = {
     jsonUrl: 'https://predictech.5d4.ru/train_model/?house_id=2',
-    startDelay: 5500,
+    startDelay: 5500, // Задержка перед запросом (5.5 сек)
     checkInterval: 2000,
     maxAttempts: 30
 };
@@ -11,7 +11,7 @@ let checkTimer = null;
 let attempts = 0;
 let modelShown = false;
 
-// === LocalStorage ключи ===
+// === Ключи для localStorage ===
 const STORAGE_KEYS = {
     date: 'lastTrainingDate',
     accuracy: 'modelAccuracyValue',
@@ -30,9 +30,13 @@ document.addEventListener('DOMContentLoaded', () => {
 // === Инициализация кнопок ===
 function initUpdateButtons() {
     const buttons = document.querySelectorAll('.btn-update');
-    if (!buttons.length) return setTimeout(initUpdateButtons, 500);
+    if (!buttons.length) {
+        return setTimeout(initUpdateButtons, 500);
+    }
 
-    buttons.forEach(btn => btn.addEventListener('click', handleClick));
+    buttons.forEach(btn => {
+        btn.addEventListener('click', handleClick);
+    });
 }
 
 // === Обработчик клика ===
@@ -42,9 +46,6 @@ function handleClick(e) {
     btn.textContent = 'Ожидание запроса...';
     modelShown = false;
 
-    removeModalConfirmActive();
-    showPreloader();
-
     console.log(`Запрос начнется через ${UPDATE_CONFIG.startDelay / 1000} секунд`);
 
     setTimeout(() => {
@@ -53,95 +54,15 @@ function handleClick(e) {
     }, UPDATE_CONFIG.startDelay);
 }
 
-// === Прелоадер ===
-function showPreloader() {
-    if (document.querySelector('.update-preloader')) return;
-
-    const preloaderHTML = `
-        <div class="update-preloader">
-            <div class="preloader-spinner"></div>
-            <div class="preloader-percent">0%</div>
-        </div>
-    `;
-    document.body.insertAdjacentHTML('beforeend', preloaderHTML);
-
-    const preloader = document.querySelector('.update-preloader');
-    const percentEl = preloader.querySelector('.preloader-percent');
-
-    let percent = 0;
-    const timer = setInterval(() => {
-        percent = Math.min(100, percent + Math.random() * 3);
-        percentEl.textContent = `${Math.floor(percent)}%`;
-        if (percent >= 100 || document.querySelector('.update-model')) {
-            hidePreloader();
-            clearInterval(timer);
-        }
-    }, 80);
-
-    // Если вдруг update-model появился раньше 100%
-    const observer = new MutationObserver(() => {
-        if (document.querySelector('.update-model')) {
-            hidePreloader();
-            observer.disconnect();
-        }
-    });
-    observer.observe(document.body, { childList: true, subtree: true });
-}
-
-function hidePreloader() {
-    const preloader = document.querySelector('.update-preloader');
-    if (preloader) {
-        preloader.classList.add('fade-out');
-        setTimeout(() => preloader.remove(), 400);
-    }
-}
-
-// === Прелоадер стили ===
-const style = document.createElement('style');
-style.textContent = `
-.update-preloader {
-    position: fixed;
-    inset: 0;
-    background: rgba(255,255,255,0.9);
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    z-index: 9999;
-    transition: opacity 0.3s ease;
-}
-.update-preloader.fade-out {
-    opacity: 0;
-}
-.preloader-spinner {
-    width: 60px;
-    height: 60px;
-    border: 5px solid #dcdcdc;
-    border-top-color: #3498db;
-    border-radius: 50%;
-    animation: spin 1s linear infinite;
-    margin-bottom: 10px;
-}
-.preloader-percent {
-    font-size: 18px;
-    color: #333;
-    font-weight: 600;
-}
-@keyframes spin {
-    0% { transform: rotate(0deg); }
-    100% { transform: rotate(360deg); }
-}`;
-document.head.appendChild(style);
-
 // === Старт проверки ===
 function startCheck() {
     attempts = 0;
     clearInterval(checkTimer);
-    checkStatus();
+    checkStatus(); // первый запрос сразу
     checkTimer = setInterval(checkStatus, UPDATE_CONFIG.checkInterval);
 }
 
-// === Проверка статуса ===
+// === Запрос к серверу ===
 async function checkStatus() {
     attempts++;
 
@@ -153,8 +74,8 @@ async function checkStatus() {
 
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
 
-        const text = await response.text();
-        const data = fastParseJSON(text);
+        const dataText = await response.text();
+        const data = fastParseJSON(dataText);
 
         if (data.status === "Success" && !modelShown) {
             modelShown = true;
@@ -180,7 +101,7 @@ async function checkStatus() {
     }
 }
 
-// === Быстрый JSON-парсер ===
+// === Ускоренный парсер JSON ===
 function fastParseJSON(text) {
     try {
         return JSON.parse(text);
@@ -190,11 +111,11 @@ function fastParseJSON(text) {
         if (start !== -1 && end !== -1) {
             return JSON.parse(text.slice(start, end + 1));
         }
-        throw new Error('Ошибка парсинга JSON');
+        throw new Error('Не удалось распарсить ответ');
     }
 }
 
-// === Обновление данных в DOM ===
+// === Обновление DOM ===
 function updatePageData(data) {
     const dateEls = document.querySelectorAll('.last-training-date');
     const accEls = document.querySelectorAll('.model-accuracy-value');
@@ -212,15 +133,21 @@ function updatePageData(data) {
         const value = formatImprovementValue(data.test_loss);
         impEls.forEach(el => (el.textContent = value));
     }
+
+    console.log('Обновлены данные модели:', data);
 }
 
 // === LocalStorage ===
 function saveToLocalStorage(data) {
-    if (data.retrain_date) localStorage.setItem(STORAGE_KEYS.date, formatDate(data.retrain_date));
-    if (data.test_accuracy !== undefined)
+    if (data.retrain_date) {
+        localStorage.setItem(STORAGE_KEYS.date, formatDate(data.retrain_date));
+    }
+    if (data.test_accuracy !== undefined) {
         localStorage.setItem(STORAGE_KEYS.accuracy, (data.test_accuracy * 100).toFixed(1) + '%');
-    if (data.test_loss !== undefined)
+    }
+    if (data.test_loss !== undefined) {
         localStorage.setItem(STORAGE_KEYS.improvement, formatImprovementValue(data.test_loss));
+    }
 }
 
 function restoreFromLocalStorage() {
@@ -228,12 +155,12 @@ function restoreFromLocalStorage() {
     const acc = localStorage.getItem(STORAGE_KEYS.accuracy);
     const imp = localStorage.getItem(STORAGE_KEYS.improvement);
 
-    if (date) document.querySelectorAll('.last-training-date').forEach(el => (el.textContent = date));
-    if (acc) document.querySelectorAll('.model-accuracy-value').forEach(el => (el.textContent = acc));
-    if (imp) document.querySelectorAll('.accuracy-improvement-value').forEach(el => (el.textContent = imp));
+    if (date) document.querySelectorAll('.last-training-date').forEach(el => el.textContent = date);
+    if (acc) document.querySelectorAll('.model-accuracy-value').forEach(el => el.textContent = acc);
+    if (imp) document.querySelectorAll('.accuracy-improvement-value').forEach(el => el.textContent = imp);
 }
 
-// === Вспомогательные ===
+// === Вспомогательные функции ===
 function formatDate(str) {
     try {
         return `${str.substring(6, 8)}.${str.substring(4, 6)}.${str.substring(0, 4)}, ${str.substring(9, 11)}:${str.substring(11, 13)}`;
@@ -241,6 +168,7 @@ function formatDate(str) {
         return str;
     }
 }
+
 function formatImprovementValue(v) {
     const num = Math.abs(v).toFixed(2);
     return `${v >= 0 ? '+' : '-'}${num}%`;
@@ -276,7 +204,7 @@ function createModal(type, message) {
 
     const modal = document.querySelector('.update-model:last-child');
     initModalEvents(modal);
-    hidePreloader(); // прелоадер исчезает при появлении модалки
+    removeModalConfirmActive();
 }
 
 function decodeUnicode(str) {
@@ -297,8 +225,8 @@ function saveOriginalButtonTexts() {
 }
 
 function removeModalConfirmActive() {
-    const modal = document.querySelector('.modal-confirm.modal-confirm-open.modal-confirm--active');
-    if (modal) modal.classList.remove('modal-confirm--active');
+    const m = document.querySelector('.modal-confirm.modal-confirm-open.modal-confirm--active');
+    if (m) m.classList.remove('modal-confirm--active');
 }
 
 function initModalEvents(modal) {
@@ -311,3 +239,13 @@ function initModalEvents(modal) {
         }
     });
 }
+
+// === Экспорт ===
+window.UpdateManager = {
+    checkStatus,
+    updatePageData,
+    showSuccessModal,
+    showErrorModal,
+    resetButtons
+};
+
