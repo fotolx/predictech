@@ -403,8 +403,6 @@ function saveOriginalButtonTexts() {
 function removeModalConfirmActive() {
     document.querySelectorAll('.modal-confirm--active').forEach(el => {
         el.classList.remove('modal-confirm--active');
-        // иногда элементы визуально скрываются через display, мы тоже прячем
-        try { el.style.display = 'none'; } catch {}
     });
 }
 
@@ -418,6 +416,7 @@ window.UpdateManager = {
     createPreloader,
     removePreloader
 };
+
 
 
 
