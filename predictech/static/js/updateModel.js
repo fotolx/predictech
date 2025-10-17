@@ -354,7 +354,7 @@ function createModal(type, message) {
         <div class="update-model">
             <div class="container-update-model">
                 <div class="update-model__content">
-                    <div class="close-update-model" role="button" title="Закрыть"><img src="/static/img/icon/close-line.svg" width="16" alt="Закрыть"></div>
+                    <div class="close-update-model" role="button" title="Закрыть"><img src="/static/img/icon/close-line.svg" alt="Закрыть"></div>
                     <div class="circle-update"><img src="${icon}" width="28" alt=""></div>
                     <div class="update-model__title">${message}</div>
                 </div>
@@ -416,6 +416,7 @@ window.UpdateManager = {
     createPreloader,
     removePreloader
 };
+
 
 
 
