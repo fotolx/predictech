@@ -4,7 +4,7 @@ const UPDATE_CONFIG = {
     startDelay: 5500, // ms перед первым запросом
     checkInterval: 2000, // ms между проверками
     maxAttempts: 30,
-    preloaderDuration: 21000 // длительность "анимации" прелоадера (ms)
+    preloaderDuration: 22000 // длительность "анимации" прелоадера (ms)
 };
 
 // === Состояние ===
@@ -418,5 +418,6 @@ window.UpdateManager = {
     createPreloader,
     removePreloader
 };
+
 
 
