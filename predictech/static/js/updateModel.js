@@ -12,7 +12,9 @@ let attempts = 0;
 let modelShown = false;
 
 let preloaderActive = false;
-let preloaderInterval = null;
+let preloaderRAF = null;          // requestAnimationFrame id
+let preloaderStartTs = null;     // timestamp начала анимации
+let preloaderDuration = 22000;   // продолжительность роста процента до 100 (ms) — 22 секунды
 let preloaderPercent = 0;
 let preloaderObserver = null;
 
@@ -158,7 +160,14 @@ function updatePageData(data) {
     if (!data) return;
     if (data.retrain_date) {
         const formatted = formatDate(data.retrain_date);
-        document.querySelectorAll('.last-training-date').forEach(el => el.textContent = formatted);
+        document.querySelectorAll('.last-training-date').forEach(el => {
+            el.textContent = formatted;
+            // если это <time>, можно также проставить datetime (если исходная строка ISO-подобная)
+            try {
+                const iso = toIsoLike(data.retrain_date);
+                if (iso) el.setAttribute('datetime', iso);
+            } catch (e) { /* ignore */ }
+        });
     }
     if (data.test_accuracy !== undefined) {
         const percent = (data.test_accuracy * 100).toFixed(1) + '%';
@@ -174,7 +183,10 @@ function updatePageData(data) {
 // === LocalStorage ===
 function saveToLocalStorage(data) {
     if (!data) return;
-    if (data.retrain_date) localStorage.setItem(STORAGE_KEYS.date, formatDate(data.retrain_date));
+    if (data.retrain_date) {
+        const formatted = formatDate(data.retrain_date);
+        localStorage.setItem(STORAGE_KEYS.date, formatted);
+    }
     if (data.test_accuracy !== undefined) localStorage.setItem(STORAGE_KEYS.accuracy, (data.test_accuracy * 100).toFixed(1) + '%');
     if (data.test_loss !== undefined) localStorage.setItem(STORAGE_KEYS.improvement, formatImprovementValue(data.test_loss));
 }
@@ -190,10 +202,9 @@ function restoreFromLocalStorage() {
 
 // === Утилиты форматирования ===
 function formatDate(str) {
-    // Попробуем распарсить ISO-like или вернуть как есть
     if (!str) return '';
-    // Если формат типа 20250115T0320 или 2025-01-15T03:20:00
-    const iso = str.replace(/^(\d{4})(\d{2})(\d{2})T?(\d{2}):?(\d{2}).*$/, '$1-$2-$3T$4:$5:00');
+    // Попробуем привести к ISO-подобному для корректного разбора
+    const iso = toIsoLike(str);
     try {
         const d = new Date(iso);
         if (!isNaN(d)) {
@@ -204,8 +215,33 @@ function formatDate(str) {
             const min = String(d.getMinutes()).padStart(2, '0');
             return `${dd}.${mm}.${yyyy}, ${hh}:${min}`;
         }
-    } catch { /* fallthrough */ }
+    } catch (e) { /* fallthrough */ }
+    // Если не ISO — попробуем простой парсинг для формата YYYYMMDDTHHMM или вернуть как есть
+    const m = String(str).match(/^(\d{4})(\d{2})(\d{2})T?(\d{2}):?(\d{2})/);
+    if (m) {
+        return `${m[3]}.${m[2]}.${m[1]}, ${m[4]}:${m[5]}`;
+    }
     return str;
+}
+
+function toIsoLike(str) {
+    // попытка превратить вход в формат, который Date корректно распарсит
+    // примеры входа: "20250115T0320", "2025-01-15T03:20:00", "2025-01-15 03:20"
+    if (!str) return '';
+    let s = String(str).trim();
+    // если уже содержит '-' и 'T' — скорее всего ISO
+    if (/\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(s)) return s;
+    // YYYYMMDDTHHMM -> YYYY-MM-DDTHH:MM:00
+    const m = s.match(/^(\d{4})(\d{2})(\d{2})T?(\d{2}):?(\d{2})/);
+    if (m) {
+        return `${m[1]}-${m[2]}-${m[3]}T${m[4]}:${m[5]}:00`;
+    }
+    // Replace space with T if looks like "YYYY-MM-DD HH:MM"
+    if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}/.test(s)) {
+        return s.replace(' ', 'T') + ':00';
+    }
+    // fallback: return original (Date may still parse)
+    return s;
 }
 
 function formatImprovementValue(v) {
@@ -218,6 +254,7 @@ function createPreloader() {
     if (preloaderActive) return;
     preloaderActive = true;
     preloaderPercent = 0;
+    preloaderStartTs = null;
 
     // стили прелоадера (вставляем однократно)
     if (!document.getElementById('update-preloader-styles')) {
@@ -236,7 +273,6 @@ function createPreloader() {
 
     // Убираем видимые modal-confirm (если они перекрывают)
     document.querySelectorAll('.modal-confirm--active').forEach(m => {
-        // если нужно полностью скрыть — ставим display none для более агрессивного эффекта
         m.classList.remove('modal-confirm--active');
         m.style.display = 'none';
     });
@@ -253,18 +289,26 @@ function createPreloader() {
     `;
     document.body.appendChild(wrapper);
 
-    // Интервал прогресса
-    preloaderInterval = setInterval(() => {
-        if (preloaderPercent < 90) {
-            preloaderPercent += Math.floor(Math.random() * 4) + 1;
-        } else if (preloaderPercent < 98) {
-            preloaderPercent += 1;
-        } else {
-            preloaderPercent = Math.min(preloaderPercent + 0, 99);
-        }
-        preloaderPercent = Math.min(preloaderPercent, 99);
+    // Анимация процента: используем requestAnimationFrame для плавности и точности времени
+    function step(ts) {
+        if (!preloaderStartTs) preloaderStartTs = ts;
+        const elapsed = ts - preloaderStartTs;
+        const progress = Math.min(1, elapsed / preloaderDuration);
+        preloaderPercent = Math.floor(progress * 100);
         updatePreloaderPercent(preloaderPercent);
-    }, 120);
+
+        if (progress < 1 && preloaderActive) {
+            preloaderRAF = requestAnimationFrame(step);
+        } else {
+            // дошли до 100%
+            preloaderPercent = 100;
+            updatePreloaderPercent(100);
+            preloaderRAF = null;
+            // НЕ удаляем прелоадер автоматически — он убирается showSuccessModal/showErrorModal или от наблюдателя.
+            console.log('[UpdateManager] preloader reached 100% (22s)');
+        }
+    }
+    preloaderRAF = requestAnimationFrame(step);
 
     // Наблюдатель: если в DOM появится .update-model (модалка успеха/ошибки), убираем прелоадер
     preloaderObserver = new MutationObserver((mutations) => {
@@ -286,31 +330,34 @@ function removePreloader(setTo100 = false) {
 
     // если нет элемента — просто почистим интервалы
     const wrapper = document.getElementById('update-preloader');
-    if (!wrapper) {
-        cleanupPreloaderState();
-        return;
+
+    if (setTo100) {
+        // гарантируем показать 100% перед исчезновением
+        updatePreloaderPercent(100);
     }
 
-    if (setTo100) updatePreloaderPercent(100);
+    if (wrapper) {
+        wrapper.classList.add('fade-out');
+        // удалим через небольшой таймаут, чтобы анимация fade была видна
+        setTimeout(() => {
+            if (wrapper && wrapper.parentNode) wrapper.parentNode.removeChild(wrapper);
+        }, 300);
+    }
 
-    wrapper.classList.add('fade-out');
     cleanupPreloaderState();
-
-    setTimeout(() => {
-        if (wrapper && wrapper.parentNode) wrapper.parentNode.removeChild(wrapper);
-    }, 300);
 }
 
 function cleanupPreloaderState() {
-    if (preloaderInterval) {
-        clearInterval(preloaderInterval);
-        preloaderInterval = null;
+    if (preloaderRAF) {
+        cancelAnimationFrame(preloaderRAF);
+        preloaderRAF = null;
     }
     if (preloaderObserver) {
         try { preloaderObserver.disconnect(); } catch (e) { /* ignore */ }
         preloaderObserver = null;
     }
     preloaderPercent = 0;
+    preloaderStartTs = null;
 }
 
 // === Модалки уведомлений (создаём простую .update-model) ===
@@ -333,10 +380,10 @@ function createModal(type, message) {
     const html = `
         <div class="update-model" role="dialog" aria-modal="true">
             <div class="container-update-model">
-                <div class="update-model__content" style="padding:18px;background:#fff;border-radius:10px;min-width:260px;box-shadow:0 10px 30px rgba(0,0,0,0.15);display:flex;flex-direction:column;gap:12px;align-items:center;">
-                    <div class="close-update-model" title="Закрыть" style="align-self:flex-end;cursor:pointer;"><img src="/static/img/icon/close-line.svg" alt="Закрыть" width="16"></div>
-                    <div class="circle-update" style="width:56px;height:56px;border-radius:50%;display:flex;align-items:center;justify-content:center;"><img src="${icon}" alt="" width="28"></div>
-                    <div class="update-model__title" style="text-align:center;font-weight:700;">${message}</div>
+                <div class="update-model__content">
+                    <div class="close-update-model" title="Закрыть""><img src="/static/img/icon/close-line.svg" alt="Закрыть" width="16"></div>
+                    <div class="circle-update""><img src="${icon}" alt="" width="28"></div>
+                    <div class="update-model__title"">${message}</div>
                 </div>
             </div>
         </div>
