@@ -262,7 +262,7 @@ function createPreloader() {
         style.id = 'update-preloader-styles';
         style.textContent = `
             .update-preloader { position: fixed; inset: 0; display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.45);z-index:9999999;}
-            .update-preloader__inner { display:flex;flex-direction:column;align-items:center;gap:12px;padding:18px 24px;border-radius:12px;background:rgba(255,255,255,0.95);box-shadow:0 10px 30px rgba(0,0,0,0.25);min-width:160px;min-height:120px;}
+            .update-preloader__inner { display:flex;flex-direction:column;align-items:center;gap:12px;padding:24px 24px;border-radius:12px;background:rgba(255,255,255,0.95);box-shadow:0 10px 30px rgba(0,0,0,0.25);min-width:200px;}
             .update-preloader .spinner { width:64px;height:64px;border-radius:50%;border:6px solid rgba(0,0,0,0.08);border-top-color:rgba(0,0,0,0.55);animation:upreloader-spin 1s linear infinite;box-sizing:border-box;}
             @keyframes upreloader-spin{to{transform:rotate(360deg)}}
             .update-preloader .percent { font-size:20px;font-weight:700;color:#111; }
@@ -455,3 +455,4 @@ window.UpdateManager = {
     createPreloader,
     removePreloader
 };
+
