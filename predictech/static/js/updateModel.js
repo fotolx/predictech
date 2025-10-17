@@ -1,9 +1,10 @@
 // === Конфигурация ===
 const UPDATE_CONFIG = {
     jsonUrl: 'https://predictech.5d4.ru/train_model/?house_id=2',
-    startDelay: 5500, // ms
-    checkInterval: 2000, // ms
-    maxAttempts: 30
+    startDelay: 5500, // ms перед первым запросом
+    checkInterval: 2000, // ms между проверками
+    maxAttempts: 30,
+    preloaderDuration: 22000 // длительность "анимации" прелоадера (ms)
 };
 
 // === Состояние ===
@@ -14,7 +15,6 @@ let modelShown = false;
 let preloaderActive = false;
 let preloaderRAF = null;
 let preloaderStartTs = null;
-let preloaderDuration = 22000;
 let preloaderPercent = 0;
 let preloaderObserver = null;
 
@@ -27,38 +27,53 @@ const STORAGE_KEYS = {
 
 // === Инициализация ===
 (function init() {
-    document.addEventListener('DOMContentLoaded', () => {
-        restoreFromLocalStorage();
-        saveOriginalButtonTexts();
-        initUpdateButtons();
-        console.log('[UpdateManager] ready');
-    });
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', onReady);
+    } else {
+        onReady();
+    }
 })();
 
-// === Кнопки обновления ===
+function onReady() {
+    restoreFromLocalStorage();
+    saveOriginalButtonTexts();
+    initUpdateButtons(); // назначает делегированный слушатель кликов
+    console.log('[UpdateManager] ready');
+}
+
+// === Назначение обработчиков кнопок (делегация) ===
 function initUpdateButtons() {
-    const buttons = document.querySelectorAll('.btn-update');
-    if (!buttons.length) return setTimeout(initUpdateButtons, 500);
-    buttons.forEach(btn => {
-        btn.removeEventListener('click', handleClick);
-        btn.addEventListener('click', handleClick);
-    });
+    // Используем делегацию — удобно, если кнопки динамические
+    document.removeEventListener('click', delegatedClickHandler);
+    document.addEventListener('click', delegatedClickHandler);
+}
+
+function delegatedClickHandler(e) {
+    const btn = e.target.closest && e.target.closest('.btn-update');
+    if (!btn) return;
+    handleClick(e, btn);
 }
 
 // === Обработчик клика ===
-function handleClick(e) {
-    if (e && typeof e.preventDefault === 'function') {
-        e.preventDefault();
-        e.stopPropagation();
+function handleClick(event, btnElement) {
+    if (event && typeof event.preventDefault === 'function') {
+        event.preventDefault();
+        event.stopPropagation();
     }
-    if (preloaderActive) return;
 
+    if (preloaderActive) {
+        console.log('[UpdateManager] preloader уже активен — игнорируем клик');
+        return;
+    }
+
+    // Закрываем модальное подтверждение (если есть) и показываем прелоадер
     removeModalConfirmActive();
     createPreloader();
 
+    // Блокируем кнопки и сохраняем оригинальный текст
     document.querySelectorAll('.btn-update').forEach(b => {
         b.disabled = true;
-        b.dataset.originalText = b.dataset.originalText || b.textContent;
+        if (!b.dataset.originalText) b.dataset.originalText = b.textContent.trim();
         b.textContent = 'Ожидание запроса...';
     });
 
@@ -77,7 +92,7 @@ function handleClick(e) {
 function startCheck() {
     clearInterval(checkTimer);
     attempts = 0;
-    checkStatus();
+    checkStatus(); // первый запуск сразу
     checkTimer = setInterval(checkStatus, UPDATE_CONFIG.checkInterval);
 }
 
@@ -111,6 +126,9 @@ async function checkStatus() {
             clearInterval(checkTimer);
             showTimeoutModal();
             resetButtons();
+        } else {
+            // пока ждем — ничего
+            console.log('[UpdateManager] ответ: ожидание, модель ещё не готова');
         }
     } catch (err) {
         console.error('[UpdateManager] Ошибка запроса:', err);
@@ -120,7 +138,7 @@ async function checkStatus() {
     }
 }
 
-// === Парсер JSON ===
+// === Парсер JSON с защитой от "грязного" ответа ===
 function fastParseJSON(text) {
     try {
         return JSON.parse(text);
@@ -227,21 +245,42 @@ function createPreloader() {
     preloaderPercent = 0;
     preloaderStartTs = null;
 
+    // удаляем старый (если остался)
+    const old = document.getElementById('update-preloader');
+    if (old) old.remove();
+
     const wrapper = document.createElement('div');
     wrapper.className = 'update-preloader';
     wrapper.id = 'update-preloader';
     wrapper.innerHTML = `
-        <div class="update-preloader__inner">
-            <div class="spinner"></div>
+        <div class="update-preloader__inner" role="status" aria-live="polite">
+            <div class="spinner" aria-hidden="true"></div>
             <div class="percent">0%</div>
         </div>
     `;
     document.body.appendChild(wrapper);
 
+    // Небольшой fallback: если внешние CSS не применились (display: none и т.п.), 
+    // ставим минимальные inline-стили, чтобы элемент был видим — это не заменяет ваш CSS.
+    requestAnimationFrame(() => {
+        const cs = getComputedStyle(wrapper);
+        if (cs.display === 'none' || cs.visibility === 'hidden' || cs.opacity === '0') {
+            // минимальный, безопасный набор inline-стилей для видимости
+            wrapper.style.position = 'fixed';
+            wrapper.style.inset = '0';
+            wrapper.style.display = 'flex';
+            wrapper.style.alignItems = 'center';
+            wrapper.style.justifyContent = 'center';
+            wrapper.style.background = 'rgba(0,0,0,0.45)';
+            wrapper.style.zIndex = '9999999';
+        }
+    });
+
+    // Анимация процентов на requestAnimationFrame
     function step(ts) {
         if (!preloaderStartTs) preloaderStartTs = ts;
         const elapsed = ts - preloaderStartTs;
-        const progress = Math.min(1, elapsed / preloaderDuration);
+        const progress = Math.min(1, elapsed / UPDATE_CONFIG.preloaderDuration);
         preloaderPercent = Math.floor(progress * 100);
         updatePreloaderPercent(preloaderPercent);
         if (progress < 1 && preloaderActive) {
@@ -253,8 +292,11 @@ function createPreloader() {
     }
     preloaderRAF = requestAnimationFrame(step);
 
-    preloaderObserver = new MutationObserver(() => {
-        if (document.querySelector('.update-model')) removePreloader(true);
+    // Наблюдатель: если появится модалка .update-model — автоматически закрываем прелоадер
+    preloaderObserver = new MutationObserver(mutations => {
+        if (document.querySelector('.update-model')) {
+            removePreloader(true);
+        }
     });
     preloaderObserver.observe(document.body, { childList: true, subtree: true });
 }
@@ -267,11 +309,16 @@ function updatePreloaderPercent(v) {
 function removePreloader(setTo100 = false) {
     if (!preloaderActive) return;
     preloaderActive = false;
-    const wrapper = document.getElementById('update-preloader');
+
     if (setTo100) updatePreloaderPercent(100);
+
+    const wrapper = document.getElementById('update-preloader');
     if (wrapper) {
-        wrapper.classList.add('fade-out');
-        setTimeout(() => wrapper.remove(), 300);
+        wrapper.classList.add('fade-out'); // предполагается, что у вас в CSS есть .fade-out
+        // Убираем через короткую паузу, даём время анимации
+        setTimeout(() => {
+            if (wrapper && wrapper.parentNode) wrapper.parentNode.removeChild(wrapper);
+        }, 300);
     }
     cleanupPreloaderState();
 }
@@ -279,8 +326,10 @@ function removePreloader(setTo100 = false) {
 function cleanupPreloaderState() {
     if (preloaderRAF) cancelAnimationFrame(preloaderRAF);
     preloaderRAF = null;
-    if (preloaderObserver) preloaderObserver.disconnect();
-    preloaderObserver = null;
+    if (preloaderObserver) {
+        preloaderObserver.disconnect();
+        preloaderObserver = null;
+    }
     preloaderPercent = 0;
     preloaderStartTs = null;
 }
@@ -297,14 +346,16 @@ function showTimeoutModal() {
 }
 
 function createModal(type, message) {
+    // Удаляем старые
     document.querySelectorAll('.update-model').forEach(m => m.remove());
+
     const icon = type === 'success' ? '/static/img/icon/check-4.svg' : '/static/img/icon/error.svg';
     const html = `
         <div class="update-model">
             <div class="container-update-model">
                 <div class="update-model__content">
-                    <div class="close-update-model"><img src="/static/img/icon/close-line.svg" width="16"></div>
-                    <div class="circle-update"><img src="${icon}" width="28"></div>
+                    <div class="close-update-model" role="button" title="Закрыть"><img src="/static/img/icon/close-line.svg" width="16" alt="Закрыть"></div>
+                    <div class="circle-update"><img src="${icon}" width="28" alt=""></div>
                     <div class="update-model__title">${message}</div>
                 </div>
             </div>
@@ -325,7 +376,12 @@ function initModalEvents(modal) {
     const close = modal.querySelector('.close-update-model');
     if (close) close.addEventListener('click', () => modal.remove());
     modal.addEventListener('click', e => { if (e.target === modal) modal.remove(); });
-    document.addEventListener('keydown', e => { if (e.key === 'Escape') modal.remove(); });
+    document.addEventListener('keydown', function escHandler(e) {
+        if (e.key === 'Escape') {
+            if (modal && modal.parentNode) modal.parentNode.removeChild(modal);
+            document.removeEventListener('keydown', escHandler);
+        }
+    });
 }
 
 // === Кнопки — сброс ===
@@ -339,7 +395,7 @@ function resetButtons() {
 
 function saveOriginalButtonTexts() {
     document.querySelectorAll('.btn-update').forEach(btn => {
-        if (!btn.dataset.originalText) btn.dataset.originalText = btn.textContent;
+        if (!btn.dataset.originalText) btn.dataset.originalText = btn.textContent.trim();
     });
 }
 
@@ -347,11 +403,12 @@ function saveOriginalButtonTexts() {
 function removeModalConfirmActive() {
     document.querySelectorAll('.modal-confirm--active').forEach(el => {
         el.classList.remove('modal-confirm--active');
-        el.style.display = 'none';
+        // иногда элементы визуально скрываются через display, мы тоже прячем
+        try { el.style.display = 'none'; } catch {}
     });
 }
 
-// === Экспорт ===
+// === Экспорт для дебага / тестов ===
 window.UpdateManager = {
     checkStatus,
     updatePageData,
@@ -361,4 +418,3 @@ window.UpdateManager = {
     createPreloader,
     removePreloader
 };
-
