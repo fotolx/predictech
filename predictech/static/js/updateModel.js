@@ -1,90 +1,35 @@
 // === Конфигурация ===
 const UPDATE_CONFIG = {
     jsonUrl: 'https://predictech.5d4.ru/train_model/?house_id=2',
-    startDelay: 5500, // Задержка перед запросом (5.5 сек)
-    checkInterval: 2000,
+    startDelay: 5500, // задержка перед первым запросом (ms)
+    checkInterval: 2000, // интервал опроса (ms)
     maxAttempts: 30
 };
 
-// === Глобальные переменные ===
-let checkTimer = null;
-let attempts = 0;
-let modelShown = false;
-
-// Preloader
-let preloaderInterval = null;
-let preloaderPercent = 0;
-let preloaderObserver = null;
-
-// === Ключи для localStorage ===
-const STORAGE_KEYS = {
-    date: 'lastTrainingDate',
-    accuracy: 'modelAccuracyValue',
-    improvement: 'accuracyImprovementValue'
+// === Состояние ===
+let activeUpdate = {
+    attempts: 0,
+    checkTimer: null,
+    startTimer: null,
+    preloaderInterval: null,
+    preloaderPercent: 0,
+    controller: null
 };
 
-// === Вставка CSS для преадера (если нужно — можно убрать/редактировать) ===
+let mutationObserver = null;
+
+// === Стили прелоадера (инжектим) ===
 (function injectPreloaderStyles() {
     const css = `
-    .update-preloader {
-        position: fixed;
-        z-index: 99999;
-        left: 0; top: 0; right: 0; bottom: 0;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        backdrop-filter: blur(2px);
-        background: rgba(0,0,0,0.15);
-        -webkit-font-smoothing: antialiased;
-    }
-    .update-preloader__box {
-        width: 160px;
-        height: 160px;
-        border-radius: 14px;
-        background: #fff;
-        box-shadow: 0 10px 30px rgba(0,0,0,0.12);
-        display:flex;
-        align-items:center;
-        justify-content:center;
-        flex-direction:column;
-        gap:12px;
-        padding:12px;
-    }
-    .update-preloader__spinner {
-        width: 64px;
-        height: 64px;
-        border-radius: 50%;
-        border: 6px solid rgba(0,0,0,0.08);
-        border-top-color: rgba(0,0,0,0.5);
-        animation: upd-spin 1s linear infinite;
-        display:flex;
-        align-items:center;
-        justify-content:center;
-        position: relative;
-    }
-    .update-preloader__spinner::after {
-        content: '';
-        position: absolute;
-        width: 34px;
-        height: 34px;
-        border-radius: 50%;
-        background: transparent;
-    }
-    @keyframes upd-spin {
-        to { transform: rotate(360deg); }
-    }
-    .update-preloader__percent {
-        font-size: 18px;
-        font-weight: 600;
-        color: #222;
-        min-width: 54px;
-        text-align: center;
-    }
-    .update-preloader__label {
-        font-size: 13px;
-        color: #666;
-        text-align:center;
-    }
+    .update-preloader{position:fixed;z-index:99999;left:0;top:0;right:0;bottom:0;
+        display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.15);backdrop-filter:blur(2px)}
+    .update-preloader__box{width:160px;height:160px;border-radius:14px;background:#fff;box-shadow:0 10px 30px rgba(0,0,0,0.12);
+        display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:12px}
+    .update-preloader__spinner{width:64px;height:64px;border-radius:50%;border:6px solid rgba(0,0,0,0.08);border-top-color:rgba(0,0,0,0.5);
+        animation:upd-spin 1s linear infinite;position:relative;display:flex;align-items:center;justify-content:center}
+    @keyframes upd-spin{to{transform:rotate(360deg)}}
+    .update-preloader__percent{font-size:18px;font-weight:600;color:#222;min-width:54px;text-align:center}
+    .update-preloader__label{font-size:13px;color:#666;text-align:center}
     `;
     const style = document.createElement('style');
     style.setAttribute('data-from', 'update-preloader');
@@ -95,260 +40,263 @@ const STORAGE_KEYS = {
 // === Инициализация ===
 document.addEventListener('DOMContentLoaded', () => {
     restoreFromLocalStorage();
-    setTimeout(() => {
-        saveOriginalButtonTexts();
-        initUpdateButtons();
-        initMutationObserverForUpdateModel();
-    }, 300);
+    initGlobalClickHandler();
+    initMutationObserverForUpdateModel();
 });
 
-// === Инициализация кнопок ===
-function initUpdateButtons() {
-    const buttons = document.querySelectorAll('.btn-update');
-    if (!buttons.length) {
-        // повторяем попытку найти кнопки
-        return setTimeout(initUpdateButtons, 500);
-    }
-
-    buttons.forEach(btn => {
-        btn.addEventListener('click', handleClick);
+// === Делегированный обработчик клика для .btn-update ===
+function initGlobalClickHandler() {
+    document.addEventListener('click', (e) => {
+        const btn = e.target.closest && e.target.closest('.btn-update');
+        if (!btn) return;
+        e.preventDefault();
+        startUpdateFlow(btn);
     });
 }
 
-// === Обработчик клика ===
-function handleClick(e) {
-    const btn = e.currentTarget;
-    if (btn.disabled) return;
+// === Главный поток обновления ===
+function startUpdateFlow(btn) {
+    // предотвращаем множественные одновременные процессы
+    cleanupActiveUpdate();
+
+    // сохраняем оригинальный текст кнопки (если ещё не сохранён)
+    if (!btn.dataset.originalText) btn.dataset.originalText = btn.textContent.trim();
+
     btn.disabled = true;
     btn.textContent = 'Ожидание запроса...';
-    modelShown = false;
 
-    // сразу убираем активный модал подтверждения (если есть)
-    removeModalConfirmActive();
+    // сразу убираем модалку подтверждения (убираем класс у всех элементов)
+    removeAllModalConfirmActive();
 
-    // показываем преадер (он появляется сразу)
+    // показываем прелоадер сразу
     showPreloader();
 
-    console.log(`Запрос начнется через ${UPDATE_CONFIG.startDelay / 1000} секунд`);
+    console.log(`Запрос начнётся через ${UPDATE_CONFIG.startDelay / 1000} с`);
 
-    // Запуск с задержкой (startDelay)
-    setTimeout(() => {
-        // обновляем текст кнопки и стартуем опрос
+    // запускаем таймер на старт опроса
+    activeUpdate.startTimer = setTimeout(() => {
+        if (!btn) return;
         btn.textContent = 'Проверка...';
-        startCheck();
+        activeUpdate.attempts = 0;
+        startCheckLoop(btn);
     }, UPDATE_CONFIG.startDelay);
 }
 
-// === Старт проверки ===
-function startCheck() {
-    attempts = 0;
-    clearInterval(checkTimer);
-    checkStatus(); // первый запрос сразу
-    checkTimer = setInterval(checkStatus, UPDATE_CONFIG.checkInterval);
+// === Запуск цикла опроса ===
+function startCheckLoop(btn) {
+    // abort controller на каждый цикл (чтобы иметь возможность отменить fetch)
+    activeUpdate.controller = new AbortController();
+    // Первый запрос сразу:
+    checkStatus(btn);
+    // Далее — интервал
+    activeUpdate.checkTimer = setInterval(() => checkStatus(btn), UPDATE_CONFIG.checkInterval);
 }
 
-// === Запрос к серверу ===
-async function checkStatus() {
-    attempts++;
+// === Один запрос к серверу и обработка ответа ===
+async function checkStatus(btn) {
+    activeUpdate.attempts++;
+
+    // максимальная защита — остановить по попыткам
+    if (activeUpdate.attempts > UPDATE_CONFIG.maxAttempts) {
+        finalizeWithError(btn, 'Превышено время ожидания ответа');
+        return;
+    }
 
     try {
-        const response = await fetch(`${UPDATE_CONFIG.jsonUrl}&t=${Date.now()}`, {
+        const url = `${UPDATE_CONFIG.jsonUrl}&t=${Date.now()}`;
+        const resp = await fetch(url, {
             headers: { 'Accept': 'application/json' },
-            cache: 'no-store'
+            cache: 'no-store',
+            signal: activeUpdate.controller ? activeUpdate.controller.signal : undefined
         });
 
-        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
 
-        // читаем текст и парсим
-        const dataText = await response.text();
-        const data = fastParseJSON(dataText);
+        const text = await resp.text();
+        const data = fastParseJSON(text);
 
-        if (data.status === "Success" && !modelShown) {
-            modelShown = true;
-            clearInterval(checkTimer);
+        // визуальный отклик: немного увеличить прогресс при каждом цикле
+        bumpPreloaderProgress(1, 95);
+
+        if (data && data.status === 'Success') {
+            // успех — прекращаем опрос, обновляем UI, сохраняем и показываем модал
+            clearInterval(activeUpdate.checkTimer);
+            activeUpdate.checkTimer = null;
             updatePageData(data);
             saveToLocalStorage(data);
             createModal('success', decodeUnicode(data.message || 'Модель успешно обучена!'));
             resetButtons();
-            // По требованию — когда появляется .update-model, преадер скрывается (createModal это сделает)
-        } else if (data.status === "Error") {
-            clearInterval(checkTimer);
+            cleanupActiveUpdate(true);
+        } else if (data && data.status === 'Error') {
+            clearInterval(activeUpdate.checkTimer);
+            activeUpdate.checkTimer = null;
             createModal('error', data.message || 'Ошибка обучения');
             resetButtons();
-        } else if (attempts >= UPDATE_CONFIG.maxAttempts) {
-            clearInterval(checkTimer);
-            createModal('error', 'Превышено время ожидания ответа');
-            resetButtons();
-        } else {
-            // продолжаем опрос; при каждом цикле можно слегка увеличить прогресс для визуального отклика
-            bumpPreloaderProgress(1, 95);
-        }
+            cleanupActiveUpdate(true);
+        } // иначе продолжаем опрос
     } catch (err) {
+        // если произошла отмена fetch — игнорируем; иначе — показываем ошибку
+        if (err.name === 'AbortError') {
+            console.warn('Fetch aborted');
+            return;
+        }
         console.error('Ошибка загрузки:', err);
-        clearInterval(checkTimer);
+        clearInterval(activeUpdate.checkTimer);
+        activeUpdate.checkTimer = null;
         createModal('error', 'Ошибка загрузки данных');
         resetButtons();
+        cleanupActiveUpdate(true);
     }
 }
 
-// === Ускоренный парсер JSON ===
+// === Быстрый и устойчивый парсер JSON ===
 function fastParseJSON(text) {
+    if (!text) return null;
     try {
         return JSON.parse(text);
     } catch {
         const start = text.indexOf('{');
         const end = text.lastIndexOf('}');
-        if (start !== -1 && end !== -1) {
-            return JSON.parse(text.slice(start, end + 1));
+        if (start !== -1 && end !== -1 && end > start) {
+            try {
+                return JSON.parse(text.slice(start, end + 1));
+            } catch (err) {
+                console.warn('fastParseJSON failed after slicing', err);
+            }
         }
-        throw new Error('Не удалось распарсить ответ');
     }
+    return null;
 }
 
-// === Обновление DOM ===
+// === Обновление DOM данными модели ===
 function updatePageData(data) {
-    const dateEls = document.querySelectorAll('.last-training-date');
-    const accEls = document.querySelectorAll('.model-accuracy-value');
-    const impEls = document.querySelectorAll('.accuracy-improvement-value');
-
-    if (data.retrain_date) {
-        const formatted = formatDate(data.retrain_date);
-        dateEls.forEach(el => (el.textContent = formatted));
+    try {
+        if (data.retrain_date) {
+            const formatted = formatDate(data.retrain_date);
+            document.querySelectorAll('.last-training-date').forEach(el => el.textContent = formatted);
+        }
+        if (typeof data.test_accuracy !== 'undefined') {
+            const percent = (data.test_accuracy * 100).toFixed(1) + '%';
+            document.querySelectorAll('.model-accuracy-value').forEach(el => el.textContent = percent);
+        }
+        if (typeof data.test_loss !== 'undefined') {
+            document.querySelectorAll('.accuracy-improvement-value').forEach(el => el.textContent = formatImprovementValue(data.test_loss));
+        }
+        console.log('Данные модели обновлены', data);
+    } catch (err) {
+        console.error('Ошибка при updatePageData', err);
     }
-    if (data.test_accuracy !== undefined) {
-        const percent = (data.test_accuracy * 100).toFixed(1) + '%';
-        accEls.forEach(el => (el.textContent = percent));
-    }
-    if (data.test_loss !== undefined) {
-        const value = formatImprovementValue(data.test_loss);
-        impEls.forEach(el => (el.textContent = value));
-    }
-
-    console.log('Обновлены данные модели:', data);
 }
 
 // === LocalStorage ===
+const STORAGE_KEYS = {
+    date: 'lastTrainingDate',
+    accuracy: 'modelAccuracyValue',
+    improvement: 'accuracyImprovementValue'
+};
+
 function saveToLocalStorage(data) {
-    if (data.retrain_date) {
-        localStorage.setItem(STORAGE_KEYS.date, formatDate(data.retrain_date));
-    }
-    if (data.test_accuracy !== undefined) {
-        localStorage.setItem(STORAGE_KEYS.accuracy, (data.test_accuracy * 100).toFixed(1) + '%');
-    }
-    if (data.test_loss !== undefined) {
-        localStorage.setItem(STORAGE_KEYS.improvement, formatImprovementValue(data.test_loss));
+    try {
+        if (data.retrain_date) localStorage.setItem(STORAGE_KEYS.date, formatDate(data.retrain_date));
+        if (typeof data.test_accuracy !== 'undefined') localStorage.setItem(STORAGE_KEYS.accuracy, (data.test_accuracy * 100).toFixed(1) + '%');
+        if (typeof data.test_loss !== 'undefined') localStorage.setItem(STORAGE_KEYS.improvement, formatImprovementValue(data.test_loss));
+    } catch (err) {
+        console.warn('Не удалось записать в localStorage', err);
     }
 }
 
 function restoreFromLocalStorage() {
-    const date = localStorage.getItem(STORAGE_KEYS.date);
-    const acc = localStorage.getItem(STORAGE_KEYS.accuracy);
-    const imp = localStorage.getItem(STORAGE_KEYS.improvement);
-
-    if (date) document.querySelectorAll('.last-training-date').forEach(el => el.textContent = date);
-    if (acc) document.querySelectorAll('.model-accuracy-value').forEach(el => el.textContent = acc);
-    if (imp) document.querySelectorAll('.accuracy-improvement-value').forEach(el => el.textContent = imp);
-}
-
-// === Вспомогательные функции ===
-function formatDate(str) {
     try {
-        // ожидается формат YYYYmmddTHHMM... или похожий — оставляем прежнюю логику
-        return `${str.substring(6, 8)}.${str.substring(4, 6)}.${str.substring(0, 4)}, ${str.substring(9, 11)}:${str.substring(11, 13)}`;
-    } catch {
-        return str;
+        const d = localStorage.getItem(STORAGE_KEYS.date);
+        const a = localStorage.getItem(STORAGE_KEYS.accuracy);
+        const i = localStorage.getItem(STORAGE_KEYS.improvement);
+        if (d) document.querySelectorAll('.last-training-date').forEach(el => el.textContent = d);
+        if (a) document.querySelectorAll('.model-accuracy-value').forEach(el => el.textContent = a);
+        if (i) document.querySelectorAll('.accuracy-improvement-value').forEach(el => el.textContent = i);
+    } catch (err) {
+        console.warn('restoreFromLocalStorage error', err);
     }
 }
 
+// === Форматирование даты (попытка гибкого парсинга) ===
+function formatDate(str) {
+    if (!str) return '';
+    // Если уже в подходящем виде — возвращаем
+    if (/\d{2}\.\d{2}\.\d{4}/.test(str)) return str;
+    // Попытка распарсить ISO-подобные строки
+    const iso = str.replace(/\s+/g, 'T').replace(/Z$/, '');
+    const d = new Date(iso);
+    if (!isNaN(d.getTime())) {
+        const dd = String(d.getDate()).padStart(2, '0');
+        const mm = String(d.getMonth() + 1).padStart(2, '0');
+        const yyyy = d.getFullYear();
+        const hh = String(d.getHours()).padStart(2, '0');
+        const min = String(d.getMinutes()).padStart(2, '0');
+        return `${dd}.${mm}.${yyyy}, ${hh}:${min}`;
+    }
+    // fallback — старая форма YYYYmmddTHHMM...
+    try {
+        if (str.length >= 13) {
+            const y = str.substring(0, 4);
+            const m = str.substring(4, 6);
+            const day = str.substring(6, 8);
+            const hh = str.substring(9, 11) || '00';
+            const mm2 = str.substring(11, 13) || '00';
+            return `${day}.${m}.${y}, ${hh}:${mm2}`;
+        }
+    } catch {}
+    return str;
+}
+
 function formatImprovementValue(v) {
-    const num = Math.abs(v).toFixed(2);
-    return `${v >= 0 ? '+' : '-'}${num}%`;
+    const num = Math.abs(Number(v)).toFixed(2);
+    return `${Number(v) >= 0 ? '+' : '-'}${num}%`;
 }
 
 // === Модалки ===
 function createModal(type, message) {
-    // удаляем предыдущую если есть
-    document.querySelectorAll('.update-model').forEach(m => m.remove());
+    // удаляем предыдущие
+    document.querySelectorAll('.update-model').forEach(n => n.remove());
 
     const isSuccess = type === 'success';
     const icon = isSuccess ? '/static/img/icon/check-4.svg' : '/static/img/icon/error.svg';
+    const safe = escapeHtml(message || '');
     const html = `
-        <div class="update-model">
+        <div class="update-model" role="dialog" aria-modal="true">
             <div class="container-update-model">
                 <div class="update-model__content">
-                    <div class="close-update-model"><img src="/static/img/icon/close-line.svg" alt="Закрыть"></div>
+                    <div class="close-update-model" title="Закрыть"><img src="/static/img/icon/close-line.svg" alt="Закрыть"></div>
                     <div class="circle-update ${isSuccess ? '' : 'error'}"><img src="${icon}" alt=""></div>
-                    <div class="update-model__title">${escapeHtml(message)}</div>
+                    <div class="update-model__title">${safe}</div>
                 </div>
             </div>
         </div>`;
     document.body.insertAdjacentHTML('beforeend', html);
-
-    // Т.к. появление .update-model означает что процесс завершён — прячем преадер
-    hidePreloader();
-
+    hidePreloader(); // прелоадер скрываем при создании модалки
     const modal = document.querySelector('.update-model:last-child');
     initModalEvents(modal);
-    removeModalConfirmActive();
+    removeAllModalConfirmActive();
 }
 
-function showSuccessModal(data) {
-    createModal('success', decodeUnicode(data.message || 'Модель успешно обучена!'));
-}
-function showErrorModal(data) {
-    createModal('error', data.message || 'Ошибка обучения');
-}
-function showTimeoutModal() {
-    createModal('error', 'Превышено время ожидания ответа');
-}
-
-function decodeUnicode(str) {
-    return str.replace(/\\u[\dA-F]{4}/gi, m => String.fromCharCode(parseInt(m.replace(/\\u/g, ''), 16)));
-}
-
-function escapeHtml(s) {
-    if (!s) return '';
-    return s.replace(/[&<>"']/g, function (c) {
-        return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];
-    });
-}
-
-function resetButtons() {
-    document.querySelectorAll('.btn-update').forEach(btn => {
-        btn.disabled = false;
-        btn.textContent = btn.dataset.originalText || 'Обновить';
-    });
-}
-
-function saveOriginalButtonTexts() {
-    document.querySelectorAll('.btn-update').forEach(btn => {
-        if (!btn.dataset.originalText) btn.dataset.originalText = btn.textContent;
-    });
-}
-
-function removeModalConfirmActive() {
-    const m = document.querySelector('.modal-confirm.modal-confirm-open.modal-confirm--active');
-    if (m) m.classList.remove('modal-confirm--active');
-}
-
-// === Ивенты для модалки ===
+// === Ивенты модалки ===
 function initModalEvents(modal) {
+    if (!modal) return;
     const closeBtn = modal.querySelector('.close-update-model');
-    if (closeBtn) closeBtn.addEventListener('click', () => modal.remove());
-    modal.addEventListener('click', e => { if (e.target === modal) modal.remove(); });
-    document.addEventListener('keydown', function escClose(e) {
+    const removeModal = () => modal.remove();
+    if (closeBtn) closeBtn.addEventListener('click', removeModal);
+    modal.addEventListener('click', e => { if (e.target === modal) removeModal(); });
+    function escClose(e) {
         if (e.key === 'Escape') {
-            modal.remove();
+            removeModal();
             document.removeEventListener('keydown', escClose);
         }
-    });
+    }
+    document.addEventListener('keydown', escClose);
 }
 
-// === Преадер: показать/скрыть/управление процентом ===
+// === Прелоадер ===
 function showPreloader() {
-    // если уже есть — сбрасываем прогресс
-    hidePreloader();
-
+    hidePreloader(); // сброс
     const html = `
     <div class="update-preloader" role="status" aria-live="polite">
         <div class="update-preloader__box" aria-hidden="false">
@@ -357,86 +305,114 @@ function showPreloader() {
             <div class="update-preloader__label">Идёт обновление модели...</div>
         </div>
     </div>`;
-
     document.body.insertAdjacentHTML('beforeend', html);
-    preloaderPercent = 0;
+    activeUpdate.preloaderPercent = 0;
     const percentEl = document.querySelector('.update-preloader__percent');
 
-    // start progression: плавно до 90-95% пока идёт ожидание/опрос
-    clearInterval(preloaderInterval);
-    preloaderInterval = setInterval(() => {
-        // рандомный небольшй шаг, чтобы не казалось "фонит"
-        const step = Math.random() * 2 + 0.5; // 0.5 - 2.5
-        preloaderPercent = Math.min(preloaderPercent + step, 95);
-        if (percentEl) percentEl.textContent = `${Math.floor(preloaderPercent)}%`;
+    clearInterval(activeUpdate.preloaderInterval);
+    activeUpdate.preloaderInterval = setInterval(() => {
+        const step = Math.random() * 2 + 0.5;
+        activeUpdate.preloaderPercent = Math.min(activeUpdate.preloaderPercent + step, 95);
+        if (percentEl) percentEl.textContent = `${Math.floor(activeUpdate.preloaderPercent)}%`;
     }, 200);
 }
 
 function hidePreloader() {
-    // Устанавливаем 100% и плавно удаляем
     const pre = document.querySelector('.update-preloader');
-    if (!pre) {
-        clearInterval(preloaderInterval);
-        preloaderInterval = null;
-        return;
+    clearInterval(activeUpdate.preloaderInterval);
+    activeUpdate.preloaderInterval = null;
+    activeUpdate.preloaderPercent = 100;
+    if (pre) {
+        const percentEl = pre.querySelector('.update-preloader__percent');
+        if (percentEl) percentEl.textContent = '100%';
+        setTimeout(() => {
+            document.querySelectorAll('.update-preloader').forEach(n => n.remove());
+        }, 180);
     }
-    const percentEl = pre.querySelector('.update-preloader__percent');
-    if (percentEl) percentEl.textContent = `100%`;
-    preloaderPercent = 100;
-    clearInterval(preloaderInterval);
-    preloaderInterval = null;
-
-    // небольшая задержка для плавности (можно убрать если нужен моментальный скрытие)
-    setTimeout(() => {
-        document.querySelectorAll('.update-preloader').forEach(n => n.remove());
-    }, 180);
 }
 
-// Небольшое увеличение прогресса по требованию
 function bumpPreloaderProgress(minAdd = 1, cap = 95) {
-    preloaderPercent = Math.min(cap, Math.max(preloaderPercent + (Math.random() * 3 + minAdd), preloaderPercent));
+    activeUpdate.preloaderPercent = Math.min(cap, activeUpdate.preloaderPercent + (Math.random() * 3 + minAdd));
     const el = document.querySelector('.update-preloader__percent');
-    if (el) el.textContent = `${Math.floor(preloaderPercent)}%`;
+    if (el) el.textContent = `${Math.floor(activeUpdate.preloaderPercent)}%`;
 }
 
-// === Наблюдатель: если кто-то добавит .update-model — прячем преадер автоматически ===
-function initMutationObserverForUpdateModel() {
-    if (preloaderObserver) return;
+// === Убираем класс modal-confirm--active у всех ===
+function removeAllModalConfirmActive() {
+    document.querySelectorAll('.modal-confirm--active').forEach(el => el.classList.remove('modal-confirm--active'));
+}
 
-    preloaderObserver = new MutationObserver(mutations => {
+// === Сброс текста/включение кнопок ===
+function resetButtons() {
+    document.querySelectorAll('.btn-update').forEach(btn => {
+        btn.disabled = false;
+        btn.textContent = btn.dataset.originalText || 'Обновить';
+    });
+}
+
+// === Очистка активного процесса (таймеры/fetch) ===
+function cleanupActiveUpdate(forceAbort = false) {
+    if (activeUpdate.startTimer) {
+        clearTimeout(activeUpdate.startTimer);
+        activeUpdate.startTimer = null;
+    }
+    if (activeUpdate.checkTimer) {
+        clearInterval(activeUpdate.checkTimer);
+        activeUpdate.checkTimer = null;
+    }
+    if (activeUpdate.preloaderInterval) {
+        clearInterval(activeUpdate.preloaderInterval);
+        activeUpdate.preloaderInterval = null;
+    }
+    if (activeUpdate.controller && forceAbort) {
+        try { activeUpdate.controller.abort(); } catch {}
+        activeUpdate.controller = null;
+    }
+    activeUpdate.attempts = 0;
+}
+
+// === Наблюдатель за появлением .update-model (если DOM другой скрипт вставит модалку) ===
+function initMutationObserverForUpdateModel() {
+    if (mutationObserver) return;
+    mutationObserver = new MutationObserver(mutations => {
         for (const m of mutations) {
             if (m.addedNodes && m.addedNodes.length) {
                 for (const node of m.addedNodes) {
                     if (!(node instanceof HTMLElement)) continue;
-                    if (node.classList && node.classList.contains('update-model')) {
-                        // появилось — скрываем преадер
+                    if (node.classList.contains && node.classList.contains('update-model')) {
                         hidePreloader();
+                        cleanupActiveUpdate(true);
                         return;
                     }
-                    // если внутри добавленного узла содержится .update-model
                     if (node.querySelector && node.querySelector('.update-model')) {
                         hidePreloader();
+                        cleanupActiveUpdate(true);
                         return;
                     }
                 }
             }
         }
     });
-
-    preloaderObserver.observe(document.body, { childList: true, subtree: true });
+    mutationObserver.observe(document.body, { childList: true, subtree: true });
 }
 
-// === Экспорт ===
+// === Утилиты ===
+function decodeUnicode(str = '') {
+    return str.replace(/\\u[\dA-F]{4}/gi, m => String.fromCharCode(parseInt(m.replace(/\\u/g, ''), 16)));
+}
+function escapeHtml(s = '') {
+    return s.replace(/[&<>"']/g, function (c) {
+        return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];
+    });
+}
+
+// Экспорт (для дебага)
 window.UpdateManager = {
+    startUpdateFlow,
     checkStatus,
     updatePageData,
-    showSuccessModal,
-    showErrorModal,
     resetButtons,
-    // для отладки:
     _internal: {
-        showPreloader,
-        hidePreloader,
-        bumpPreloaderProgress
+        showPreloader, hidePreloader, bumpPreloaderProgress, cleanupActiveUpdate
     }
 };
