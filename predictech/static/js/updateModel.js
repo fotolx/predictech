@@ -12,9 +12,9 @@ let attempts = 0;
 let modelShown = false;
 
 let preloaderActive = false;
-let preloaderRAF = null;          // requestAnimationFrame id
-let preloaderStartTs = null;     // timestamp начала анимации
-let preloaderDuration = 22000;   // продолжительность роста процента до 100 (ms) — 22 секунды
+let preloaderRAF = null;
+let preloaderStartTs = null;
+let preloaderDuration = 22000;
 let preloaderPercent = 0;
 let preloaderObserver = null;
 
@@ -38,12 +38,8 @@ const STORAGE_KEYS = {
 // === Кнопки обновления ===
 function initUpdateButtons() {
     const buttons = document.querySelectorAll('.btn-update');
-    if (!buttons.length) {
-        // если ещё нет кнопок на странице — попробуем позже (мягкий retry)
-        return setTimeout(initUpdateButtons, 500);
-    }
+    if (!buttons.length) return setTimeout(initUpdateButtons, 500);
     buttons.forEach(btn => {
-        // делаем делегирование на click, защищаем от дублирующих слушателей
         btn.removeEventListener('click', handleClick);
         btn.addEventListener('click', handleClick);
     });
@@ -51,24 +47,15 @@ function initUpdateButtons() {
 
 // === Обработчик клика ===
 function handleClick(e) {
-    // предотвращаем отправку формы, если кнопка внутри <form>
     if (e && typeof e.preventDefault === 'function') {
         e.preventDefault();
         e.stopPropagation();
     }
+    if (preloaderActive) return;
 
-    if (preloaderActive) {
-        console.warn('[UpdateManager] preloader already active — click ignored');
-        return;
-    }
-
-    // сразу убираем любые открытые подтверждающие модалки
     removeModalConfirmActive();
-
-    // создаём прелоадер поверх всего — сразу же
     createPreloader();
 
-    // блокируем все кнопки и изменяем текст
     document.querySelectorAll('.btn-update').forEach(b => {
         b.disabled = true;
         b.dataset.originalText = b.dataset.originalText || b.textContent;
@@ -80,7 +67,6 @@ function handleClick(e) {
 
     console.log(`[UpdateManager] старт через ${UPDATE_CONFIG.startDelay} ms`);
 
-    // через задержку начинаем проверку
     setTimeout(() => {
         document.querySelectorAll('.btn-update').forEach(b => b.textContent = 'Проверка...');
         startCheck();
@@ -91,7 +77,6 @@ function handleClick(e) {
 function startCheck() {
     clearInterval(checkTimer);
     attempts = 0;
-    // первый вызов сразу (не ждать интервала)
     checkStatus();
     checkTimer = setInterval(checkStatus, UPDATE_CONFIG.checkInterval);
 }
@@ -108,7 +93,6 @@ async function checkStatus() {
         });
 
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
-
         const text = await res.text();
         const data = fastParseJSON(text);
 
@@ -117,7 +101,7 @@ async function checkStatus() {
             clearInterval(checkTimer);
             updatePageData(data);
             saveToLocalStorage(data);
-            showSuccessModal(data); // showSuccessModal уберёт прелоадер
+            showSuccessModal(data);
             resetButtons();
         } else if (data && data.status === "Error") {
             clearInterval(checkTimer);
@@ -127,8 +111,6 @@ async function checkStatus() {
             clearInterval(checkTimer);
             showTimeoutModal();
             resetButtons();
-        } else {
-            // ещё ждём — оставляем прелоадер
         }
     } catch (err) {
         console.error('[UpdateManager] Ошибка запроса:', err);
@@ -143,32 +125,30 @@ function fastParseJSON(text) {
     try {
         return JSON.parse(text);
     } catch (e) {
-        // попытка вытащить первый JSON-объект в тексте
         const start = text.indexOf('{');
         const end = text.lastIndexOf('}');
         if (start !== -1 && end !== -1 && end > start) {
             try {
                 return JSON.parse(text.slice(start, end + 1));
-            } catch (e2) { /* fallthrough */ }
+            } catch { }
         }
         throw new Error('Не удалось распарсить ответ сервера');
     }
 }
 
-// === Обновление страницы данными ===
+// === Обновление данных на странице ===
 function updatePageData(data) {
     if (!data) return;
     if (data.retrain_date) {
-        const formatted = formatDate(data.retrain_date);
+        const formatted = formatDateReadable(data.retrain_date); // 15.01.2025, 03:20
+        const attrVal = formatDateAttr(data.retrain_date);       // 20250115_0320
+
         document.querySelectorAll('.last-training-date').forEach(el => {
             el.textContent = formatted;
-            // если это <time>, можно также проставить datetime (если исходная строка ISO-подобная)
-            try {
-                const iso = toIsoLike(data.retrain_date);
-                if (iso) el.setAttribute('datetime', iso);
-            } catch (e) { /* ignore */ }
+            el.setAttribute('datetime', attrVal);
         });
     }
+
     if (data.test_accuracy !== undefined) {
         const percent = (data.test_accuracy * 100).toFixed(1) + '%';
         document.querySelectorAll('.model-accuracy-value').forEach(el => el.textContent = percent);
@@ -184,11 +164,13 @@ function updatePageData(data) {
 function saveToLocalStorage(data) {
     if (!data) return;
     if (data.retrain_date) {
-        const formatted = formatDate(data.retrain_date);
+        const formatted = formatDateReadable(data.retrain_date);
         localStorage.setItem(STORAGE_KEYS.date, formatted);
     }
-    if (data.test_accuracy !== undefined) localStorage.setItem(STORAGE_KEYS.accuracy, (data.test_accuracy * 100).toFixed(1) + '%');
-    if (data.test_loss !== undefined) localStorage.setItem(STORAGE_KEYS.improvement, formatImprovementValue(data.test_loss));
+    if (data.test_accuracy !== undefined)
+        localStorage.setItem(STORAGE_KEYS.accuracy, (data.test_accuracy * 100).toFixed(1) + '%');
+    if (data.test_loss !== undefined)
+        localStorage.setItem(STORAGE_KEYS.improvement, formatImprovementValue(data.test_loss));
 }
 
 function restoreFromLocalStorage() {
@@ -200,50 +182,39 @@ function restoreFromLocalStorage() {
     if (i) document.querySelectorAll('.accuracy-improvement-value').forEach(el => el.textContent = i);
 }
 
-// === Утилиты форматирования ===
-function formatDate(str) {
-    if (!str) return '';
-    // Попробуем привести к ISO-подобному для корректного разбора
-    const iso = toIsoLike(str);
-    try {
-        const d = new Date(iso);
-        if (!isNaN(d)) {
-            const dd = String(d.getDate()).padStart(2, '0');
-            const mm = String(d.getMonth() + 1).padStart(2, '0');
-            const yyyy = d.getFullYear();
-            const hh = String(d.getHours()).padStart(2, '0');
-            const min = String(d.getMinutes()).padStart(2, '0');
-            return `${dd}.${mm}.${yyyy}, ${hh}:${min}`;
-        }
-    } catch (e) { /* fallthrough */ }
-    // Если не ISO — попробуем простой парсинг для формата YYYYMMDDTHHMM или вернуть как есть
-    const m = String(str).match(/^(\d{4})(\d{2})(\d{2})T?(\d{2}):?(\d{2})/);
-    if (m) {
-        return `${m[3]}.${m[2]}.${m[1]}, ${m[4]}:${m[5]}`;
-    }
-    return str;
+// === Форматирование даты ===
+function formatDateReadable(str) {
+    const d = parseDate(str);
+    if (!d) return '';
+    const dd = String(d.getDate()).padStart(2, '0');
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const yyyy = d.getFullYear();
+    const hh = String(d.getHours()).padStart(2, '0');
+    const min = String(d.getMinutes()).padStart(2, '0');
+    return `${dd}.${mm}.${yyyy}, ${hh}:${min}`;
 }
 
-function toIsoLike(str) {
-    // попытка превратить вход в формат, который Date корректно распарсит
-    // примеры входа: "20250115T0320", "2025-01-15T03:20:00", "2025-01-15 03:20"
-    if (!str) return '';
+function formatDateAttr(str) {
+    const d = parseDate(str);
+    if (!d) return '';
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    const hh = String(d.getHours()).padStart(2, '0');
+    const min = String(d.getMinutes()).padStart(2, '0');
+    return `${yyyy}${mm}${dd}_${hh}${min}`;
+}
+
+function parseDate(str) {
+    if (!str) return null;
     let s = String(str).trim();
-    // если уже содержит '-' и 'T' — скорее всего ISO
-    if (/\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(s)) return s;
-    // YYYYMMDDTHHMM -> YYYY-MM-DDTHH:MM:00
-    const m = s.match(/^(\d{4})(\d{2})(\d{2})T?(\d{2}):?(\d{2})/);
-    if (m) {
-        return `${m[1]}-${m[2]}-${m[3]}T${m[4]}:${m[5]}:00`;
-    }
-    // Replace space with T if looks like "YYYY-MM-DD HH:MM"
-    if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}/.test(s)) {
-        return s.replace(' ', 'T') + ':00';
-    }
-    // fallback: return original (Date may still parse)
-    return s;
+    const m = s.match(/^(\d{4})(\d{2})(\d{2})[_T]?(\d{2}):?(\d{2})?$/);
+    if (m) return new Date(`${m[1]}-${m[2]}-${m[3]}T${m[4]}:${m[5] || '00'}:00`);
+    const d = new Date(s);
+    return isNaN(d) ? null : d;
 }
 
+// === Прочие утилиты ===
 function formatImprovementValue(v) {
     const num = Math.abs(Number(v)).toFixed(2);
     return `${Number(v) >= 0 ? '+' : '-'}${num}%`;
@@ -256,152 +227,111 @@ function createPreloader() {
     preloaderPercent = 0;
     preloaderStartTs = null;
 
-    // стили прелоадера (вставляем однократно)
     if (!document.getElementById('update-preloader-styles')) {
         const style = document.createElement('style');
         style.id = 'update-preloader-styles';
         style.textContent = `
-            .update-preloader { position: fixed; inset: 0; display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.45);z-index:9999999;}
-            .update-preloader__inner { display:flex;flex-direction:column;align-items:center;gap:12px;padding:24px 24px;border-radius:12px;background:rgba(255,255,255,0.95);box-shadow:0 10px 30px rgba(0,0,0,0.25);min-width:200px;}
-            .update-preloader .spinner { width:64px;height:64px;border-radius:50%;border:6px solid rgba(0,0,0,0.08);border-top-color:rgba(0,0,0,0.55);animation:upreloader-spin 1s linear infinite;box-sizing:border-box;}
-            @keyframes upreloader-spin{to{transform:rotate(360deg)}}
-            .update-preloader .percent { font-size:20px;font-weight:700;color:#111; }
-            .update-preloader.fade-out { transition:opacity 260ms ease; opacity:0; pointer-events:none; }
+            .update-preloader { position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.45);z-index:9999999;}
+            .update-preloader__inner {display:flex;flex-direction:column;align-items:center;gap:12px;padding:24px;border-radius:12px;background:#fff;box-shadow:0 10px 30px rgba(0,0,0,0.25);}
+            .spinner {width:64px;height:64px;border-radius:50%;border:6px solid rgba(0,0,0,0.08);border-top-color:rgba(0,0,0,0.55);animation:spin 1s linear infinite;}
+            @keyframes spin {to{transform:rotate(360deg)}}
+            .percent {font-size:20px;font-weight:700;color:#111;}
+            .fade-out {transition:opacity 260ms ease;opacity:0;pointer-events:none;}
         `;
         document.head.appendChild(style);
     }
 
-    // Убираем видимые modal-confirm (если они перекрывают)
-    document.querySelectorAll('.modal-confirm--active').forEach(m => {
-        m.classList.remove('modal-confirm--active');
-        m.style.display = 'none';
-    });
-
-    // Создаём DOM
     const wrapper = document.createElement('div');
     wrapper.className = 'update-preloader';
     wrapper.id = 'update-preloader';
     wrapper.innerHTML = `
-        <div class="update-preloader__inner" role="status" aria-live="polite" aria-label="Идет обновление">
-            <div class="spinner" aria-hidden="true"></div>
+        <div class="update-preloader__inner">
+            <div class="spinner"></div>
             <div class="percent">0%</div>
         </div>
     `;
     document.body.appendChild(wrapper);
 
-    // Анимация процента: используем requestAnimationFrame для плавности и точности времени
     function step(ts) {
         if (!preloaderStartTs) preloaderStartTs = ts;
         const elapsed = ts - preloaderStartTs;
         const progress = Math.min(1, elapsed / preloaderDuration);
         preloaderPercent = Math.floor(progress * 100);
         updatePreloaderPercent(preloaderPercent);
-
         if (progress < 1 && preloaderActive) {
             preloaderRAF = requestAnimationFrame(step);
         } else {
-            // дошли до 100%
-            preloaderPercent = 100;
             updatePreloaderPercent(100);
-            preloaderRAF = null;
-            // НЕ удаляем прелоадер автоматически — он убирается showSuccessModal/showErrorModal или от наблюдателя.
-            console.log('[UpdateManager] preloader reached 100% (22s)');
+            console.log('[Preloader] 100%');
         }
     }
     preloaderRAF = requestAnimationFrame(step);
 
-    // Наблюдатель: если в DOM появится .update-model (модалка успеха/ошибки), убираем прелоадер
-    preloaderObserver = new MutationObserver((mutations) => {
-        if (document.querySelector('.update-model')) {
-            removePreloader(true);
-        }
+    preloaderObserver = new MutationObserver(() => {
+        if (document.querySelector('.update-model')) removePreloader(true);
     });
     preloaderObserver.observe(document.body, { childList: true, subtree: true });
 }
 
 function updatePreloaderPercent(v) {
     const el = document.querySelector('#update-preloader .percent');
-    if (el) el.textContent = `${Math.max(0, Math.min(100, Math.floor(v)))}%`;
+    if (el) el.textContent = `${Math.max(0, Math.min(100, v))}%`;
 }
 
 function removePreloader(setTo100 = false) {
     if (!preloaderActive) return;
     preloaderActive = false;
-
-    // если нет элемента — просто почистим интервалы
     const wrapper = document.getElementById('update-preloader');
-
-    if (setTo100) {
-        // гарантируем показать 100% перед исчезновением
-        updatePreloaderPercent(100);
-    }
-
+    if (setTo100) updatePreloaderPercent(100);
     if (wrapper) {
         wrapper.classList.add('fade-out');
-        // удалим через небольшой таймаут, чтобы анимация fade была видна
-        setTimeout(() => {
-            if (wrapper && wrapper.parentNode) wrapper.parentNode.removeChild(wrapper);
-        }, 300);
+        setTimeout(() => wrapper.remove(), 300);
     }
-
     cleanupPreloaderState();
 }
 
 function cleanupPreloaderState() {
-    if (preloaderRAF) {
-        cancelAnimationFrame(preloaderRAF);
-        preloaderRAF = null;
-    }
-    if (preloaderObserver) {
-        try { preloaderObserver.disconnect(); } catch (e) { /* ignore */ }
-        preloaderObserver = null;
-    }
+    if (preloaderRAF) cancelAnimationFrame(preloaderRAF);
+    preloaderRAF = null;
+    if (preloaderObserver) preloaderObserver.disconnect();
+    preloaderObserver = null;
     preloaderPercent = 0;
     preloaderStartTs = null;
 }
 
-// === Модалки уведомлений (создаём простую .update-model) ===
+// === Модалки ===
 function showSuccessModal(data) {
-    createModal('success', decodeUnicode((data && data.message) ? data.message : 'Модель успешно обучена!'));
+    createModal('success', decodeUnicode(data?.message || 'Модель успешно обучена!'));
 }
 function showErrorModal(data) {
-    createModal('error', (data && data.message) ? data.message : 'Ошибка обучения');
+    createModal('error', data?.message || 'Ошибка обучения');
 }
 function showTimeoutModal() {
     createModal('error', 'Превышено время ожидания ответа');
 }
 
 function createModal(type, message) {
-    // удалим старые
     document.querySelectorAll('.update-model').forEach(m => m.remove());
-
-    const isSuccess = type === 'success';
-    const icon = isSuccess ? '/static/img/icon/check-4.svg' : '/static/img/icon/error.svg';
+    const icon = type === 'success' ? '/static/img/icon/check-4.svg' : '/static/img/icon/error.svg';
     const html = `
-        <div class="update-model" role="dialog" aria-modal="true">
+        <div class="update-model">
             <div class="container-update-model">
                 <div class="update-model__content">
-                    <div class="close-update-model" title="Закрыть""><img src="/static/img/icon/close-line.svg" alt="Закрыть" width="16"></div>
-                    <div class="circle-update""><img src="${icon}" alt="" width="28"></div>
-                    <div class="update-model__title"">${message}</div>
+                    <div class="close-update-model"><img src="/static/img/icon/close-line.svg" width="16"></div>
+                    <div class="circle-update"><img src="${icon}" width="28"></div>
+                    <div class="update-model__title">${message}</div>
                 </div>
             </div>
-        </div>
-    `;
+        </div>`;
     document.body.insertAdjacentHTML('beforeend', html);
     const modal = document.querySelector('.update-model:last-child');
     initModalEvents(modal);
-
-    // прелоадер убираем, если он есть
     removePreloader(true);
-
-    // дополнительно убираем modal-confirm--active если осталось
     removeModalConfirmActive();
 }
 
 function decodeUnicode(str) {
-    if (!str) return '';
-    return str.replace(/\\u[\dA-F]{4}/gi, m => String.fromCharCode(parseInt(m.replace(/\\u/g, ''), 16)));
+    return str ? str.replace(/\\u[\dA-F]{4}/gi, m => String.fromCharCode(parseInt(m.replace(/\\u/g, ''), 16))) : '';
 }
 
 function initModalEvents(modal) {
@@ -409,22 +339,15 @@ function initModalEvents(modal) {
     const close = modal.querySelector('.close-update-model');
     if (close) close.addEventListener('click', () => modal.remove());
     modal.addEventListener('click', e => { if (e.target === modal) modal.remove(); });
-    function escClose(e) {
-        if (e.key === 'Escape') {
-            modal.remove();
-            document.removeEventListener('keydown', escClose);
-        }
-    }
-    document.addEventListener('keydown', escClose);
+    document.addEventListener('keydown', e => { if (e.key === 'Escape') modal.remove(); });
 }
 
-// === Кнопки — сброс состояния ===
+// === Кнопки — сброс ===
 function resetButtons() {
     document.querySelectorAll('.btn-update').forEach(btn => {
         btn.disabled = false;
         btn.textContent = btn.dataset.originalText || 'Обновить';
     });
-    // на всякий случай убираем прелоадер
     removePreloader(false);
 }
 
@@ -434,18 +357,15 @@ function saveOriginalButtonTexts() {
     });
 }
 
-// === Корректное удаление modal-confirm--active ===
+// === Удаление modal-confirm--active ===
 function removeModalConfirmActive() {
-    // Найдём все элементы с этим классом (на странице может быть 1 или несколько)
-    const activeEls = document.querySelectorAll('.modal-confirm--active');
-    activeEls.forEach(el => {
+    document.querySelectorAll('.modal-confirm--active').forEach(el => {
         el.classList.remove('modal-confirm--active');
-        // на всякий случай скроем визуально
         el.style.display = 'none';
     });
 }
 
-// === Экспорт (если нужно внешне вызывать) ===
+// === Экспорт ===
 window.UpdateManager = {
     checkStatus,
     updatePageData,
@@ -455,4 +375,3 @@ window.UpdateManager = {
     createPreloader,
     removePreloader
 };
-
