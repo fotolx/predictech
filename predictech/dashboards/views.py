@@ -1,4 +1,4 @@
-from django.shortcuts import render
+from django.shortcuts import redirect, render
 from django.views import View
 from django.views.generic import CreateView
 from django.http import JsonResponse
@@ -149,8 +149,9 @@ class HouseView(View):
         return HttpResponse(data, content_type="application/json", status=200)
 
 class RealDataRetrainer:
-    def __init__(self, sequence_length=12):
+    def __init__(self, sequence_length=12, temperature=1.0):
         self.sequence_length = sequence_length
+        self.temperature = temperature
         self.model = None
         self.scaler = StandardScaler()
         self.label_encoder = LabelEncoder()
@@ -210,7 +211,7 @@ class RealDataRetrainer:
                 features[f'{col}_std_{window}h'] = features[col].rolling(window=window).std().apply(self._round_flow_value)
 
         # Заполнение пропусков
-        features = features.bfill().ffill().dropna()
+        features = features.replace('nan', np.nan).dropna()
 
         print(f"Создано признаков: {len([col for col in features.columns if col not in ['timestamp', 'label']])}")
         return features
@@ -255,11 +256,29 @@ class RealDataRetrainer:
         )
 
         return model
+    
+    def predict_with_temperature(self, X_data, temperature=None):
+        """Предсказание с регулируемой температурой"""
+        if temperature is None:
+            temperature = self.temperature
 
+        # Получаем оригинальные вероятности
+        original_proba = self.model.predict(X_data, verbose=0)
+
+        if temperature == 1.0:
+            return np.argmax(original_proba, axis=1), original_proba
+
+        # Применяем температурное масштабирование
+        adjusted_proba = original_proba ** (1/temperature)
+        adjusted_proba = adjusted_proba / adjusted_proba.sum(axis=1, keepdims=True)
+
+        return np.argmax(adjusted_proba, axis=1), adjusted_proba
+    
     def retrain_model(self, data, days_back=30, epochs=10):
         start_time = time.time()
         """Основной метод переобучения на реальных данных"""
         print("=== ПЕРЕОБУЧЕНИЕ МОДЕЛИ НА РЕАЛЬНЫХ ДАННЫХ ===")
+        print(f"Температурный параметр: {self.temperature}")
 
         # 1. Загрузка данных
         print("1. Загрузка данных")
@@ -326,6 +345,7 @@ class RealDataRetrainer:
 - Дата переобучения: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
 - Количество признаков: {len(self.feature_columns)}
 - Длина последовательности: {self.sequence_length}
+- Температурный параметр: {self.temperature}
 - Классы: {list(self.label_encoder.classes_)}
 - Точность на тесте: {self.test_accuracy:.4f}
 - Тестовые потери: {self.test_loss:.4f}
@@ -344,6 +364,7 @@ class RealDataRetrainer:
             'label_encoder': self.label_encoder,
             'feature_columns': self.feature_columns,
             'sequence_length': self.sequence_length,
+            'temperature': self.temperature,
             'retrain_date': current_date
         }
         with open(metadata_path, 'wb') as f:
@@ -366,6 +387,7 @@ class RealDataRetrainer:
             "status": "Success",
             "message": "Модель успешно переобучена и сохранена!",
             "sequence_length": self.sequence_length,
+            "temperature": self.temperature,
             "retrain_date": current_date,
             "test_accuracy": self.test_accuracy,
             "test_loss": self.test_loss,
@@ -373,12 +395,16 @@ class RealDataRetrainer:
         }
         return json.dumps(result)
 
-
-def retrain_model(data, days_back=30, epochs=8, house_id=None):
+    # РЕГУЛИРОВКА ЧУВСТВИТЕЛЬНОСТИ МОДЕЛИ
+    # Измените значение temperature для регулировки чувствительности:
+    # - temperature < 1.0: более чувствительная модель (чаще предсказывает аномалии)
+    # - temperature > 1.0: менее чувствительная модель (реже предсказывает аномалии)
+    # - temperature = 1.0: оригинальная модель (без изменений) 
+def retrain_model(data, days_back=30, epochs=8, house_id=None, temperature=1.0):
     """Функция для запуска переобучения"""
     try:
         # Создание и запуск переобучения
-        retrainer = RealDataRetrainer(sequence_length=12)
+        retrainer = RealDataRetrainer(sequence_length=12, temperature=temperature)
         history, features = retrainer.retrain_model(
             data=data,
             days_back=days_back, 
@@ -395,7 +421,7 @@ def retrain_model(data, days_back=30, epochs=8, house_id=None):
 def prepare_data(house, detectors_list, days_back=30):
     data = pd.DataFrame()
     now = timezone.now()
-    days_back=30  # Данные за последние 30 дней
+    # days_back=30  # Данные за последние 30 дней
     for detector in detectors_list:
         detector_data = pd.DataFrame(DetectorData.objects.filter(detector_id=detector.detector_id, timestamp__date__gte=(now - timedelta(days=days_back)).date()).order_by('-timestamp').values('timestamp','value'))
         detector_data.rename(columns={"value":detector.name}, inplace=True)
@@ -428,7 +454,40 @@ def train_model(request):
         epochs=8
         result = retrain_model(data, days_back=days_back, epochs=epochs, house_id=house)
         return HttpResponse(f"{result}", status=200)
-    
+
+class DetectorsAtHouseDataView(View):
+    def get(self, request, *args, **kwargs):
+        if request.GET.get("house_id") is None:
+            return HttpResponse("Bad request", status=400)
+        house = request.GET.get("house_id")
+        days_back=30
+        last = False
+        detectors_list = DetectorsAtHouse.objects.filter(house_id=house)
+        if not len(detectors_list):
+            return HttpResponse(json.dumps({"status": "Error", "message": "Bad request. No detectors"}), status=400)
+        if request.GET.get("range") is None:
+            days_back=30
+        elif request.GET.get("range") == "day":
+            days_back=1
+        elif request.GET.get("range") == "week":
+            days_back=7
+        elif request.GET.get("range") == "month":
+            days_back=30
+        elif request.GET.get("range") == "last":
+            last = True
+            days_back=1
+            data = prepare_data(house, detectors_list, days_back=1)
+        data = prepare_data(house, detectors_list, days_back=days_back)
+        if last:
+            data = data.sort_values('timestamp').iloc[-1]
+        if request.GET.get("count") == "True":
+            df_info = ((data['label'] == 'nan').sum())
+            features = data.replace('nan', np.nan)
+            with_nan = features[features['label'].notnan()]
+            return HttpResponse(f"nan values count: {df_info}\n\nOverall lines: {data.count()}\n\nDropped nan lines count: {features.dropna().count()}\n\nNan lines count: {with_nan.count()}", content_type="text/plain", status=200)
+        data = data.to_json(orient='records')
+        return HttpResponse(data, content_type="application/json", status=200)
+        
 def predict(request):
     if request.method == 'GET':
         if request.GET.get("house_id") is None:
@@ -670,3 +729,34 @@ def forecast(request):
         Forecast.objects.create(timestamp=timestamp, house_id=house_obj, forecast=forecast.to_json())
 
     return HttpResponse(forecast.to_json(), status=200)
+
+@method_decorator(csrf_exempt, name='dispatch')
+class RisksValuesView(View):
+    def get(self, request, *args, **kwargs):
+        try:
+            risks = RiskValues.objects.last()
+        except:
+            risks = None
+        return HttpResponse(serialize("json", [risks]), content_type="application/json", status=200)
+    
+    def post(self, request, *args, **kwargs):
+        if request.POST.get("house_id") is None:
+            house_id = 1
+        else:
+            house_id = request.POST.get("house_id")
+        house = House.objects.get(id=house_id)
+        flow_xvs = request.POST.get("xvs")
+        flow_gvs = request.POST.get("gvs")
+        cold_water_supply = request.POST.get("cold_water_supply")
+        reverse_flow = request.POST.get("reverse_flow")
+        temp_supply = request.POST.get("t1")
+        temp_return = request.POST.get("t2")
+        sensivity = request.POST.get("sensivity")
+        RiskValues.objects.create(house_id=house, xvs=flow_xvs, gvs=flow_gvs, cold_water_supply=cold_water_supply, 
+                                  reverse_flow=reverse_flow, t1=temp_supply, t2=temp_return, sensivity=sensivity)
+        result = {
+            "status": "Success",
+            "message": "Настройки сохранены успешно.",
+            }
+        # return HttpResponse(json.dumps(result), content_type="application/json", status=200)
+        return redirect(request.headers._store['origin'][1])

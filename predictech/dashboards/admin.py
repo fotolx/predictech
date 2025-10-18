@@ -39,4 +39,7 @@ class StateLabelAdmin(admin.ModelAdmin):
 class ForecastAdmin(admin.ModelAdmin):
     pass
 
+class RiskValuesAdmin(admin.ModelAdmin):
+    pass
+
 admin_register(namespace=globals())

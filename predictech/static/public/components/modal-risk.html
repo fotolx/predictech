@@ -13,34 +13,34 @@
                 <div class="accuracy-improvement">Улучшение точности: <span class="improvement-m">+2.8%</span></div>
             </div>
             <div class="title-risk">Уведомлять при отклонении более, чем:</div>
-            <form action="https://predictech.5d4.ru/risks" method="post" autocomplete="off" class="risk-settings form-update">
+            <form action="/risks/" method="post" autocomplete="off" class="risk-settings form-update">
                 <div class="risk-setting">
-                    <input type="number" name="xvs" class="risk-input" placeholder="4">
+                    <input type="number" name="xvs" class="risk-input" placeholder="4" value="4">
                     <div class="risk-label">ХВС</div>
                 </div>
                 <div class="risk-setting">
-                    <input type="number" name="gvs" class="risk-input" placeholder="12">
+                    <input type="number" name="gvs" class="risk-input" placeholder="12" value="12">
                     <div class="risk-label">ГВС</div>
                 </div>
                 <div class="risk-setting">
-                    <input type="number" name="cold_water_supply" class="risk-input" placeholder="5">
+                    <input type="number" name="cold_water_supply" class="risk-input" placeholder="5" value="5">
                     <div class="risk-label">Подача</div>
                 </div>
                 <div class="risk-setting">
-                    <input type="number" name="reverse_flow" class="risk-input" placeholder="7">
+                    <input type="number" name="reverse_flow" class="risk-input" placeholder="7" value="7">
                     <div class="risk-label">Обратка</div>
                 </div>
                 <div class="risk-setting">
-                    <input type="number" name="t1" class="risk-input" placeholder="8">
+                    <input type="number" name="t1" class="risk-input" placeholder="8" value="8">
                     <div class="risk-label">Т1</div>
                 </div>
                 <div class="risk-setting">
-                    <input type="number" name="t2" class="risk-input" placeholder="4">
+                    <input type="number" name="t2" class="risk-input" placeholder="4" value="4">
                     <div class="risk-label">Т2</div>
                 </div>
                 <div class="slider-wrapper" aria-live="polite">
                     <label class="slider-label" for="sensitivity">
-                        <span>Чувстительность модели</span>
+                        <span>Чувствительность модели</span>
                         <span id="sensitivity-value" class="slider-value">1</span>
                     </label>
 

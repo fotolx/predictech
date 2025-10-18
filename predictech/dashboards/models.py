@@ -122,3 +122,17 @@ class Forecast(models.Model):
     forecast = models.CharField(max_length=1000, default="", blank=True)
     def __str__(self):
         return self.house_id.__str__()+" - "+self.timestamp.__str__()
+    
+class RiskValues(models.Model):
+    timestamp = models.DateTimeField(default=timezone.now)
+    house_id = models.ForeignKey(House, null=False, blank=False, on_delete=models.CASCADE)
+    xvs = models.SmallIntegerField(default=0)
+    gvs = models.SmallIntegerField(default=0)
+    cold_water_supply = models.SmallIntegerField(default=0)
+    reverse_flow = models.SmallIntegerField(default=0)
+    t1 = models.SmallIntegerField(default=0)
+    t2 = models.SmallIntegerField(default=0)
+    sensivity = models.FloatField(default=0.0)
+
+    def __str__(self):
+        return self.house_id.__str__()+" - "+self.timestamp.__str__()+" - "+self.sensivity.__str__()
