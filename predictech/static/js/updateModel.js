@@ -416,12 +416,3 @@ window.UpdateManager = {
     createPreloader,
     removePreloader
 };
-
-
-
-
-
-
-
-
-
