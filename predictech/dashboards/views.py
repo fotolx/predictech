@@ -737,6 +737,7 @@ class RisksValuesView(View):
             risks = RiskValues.objects.last()
         except:
             risks = None
+            return HttpResponse(json.dumps(risks), content_type="application/json", status=400)        
         return HttpResponse(serialize("json", [risks]), content_type="application/json", status=200)
     
     def post(self, request, *args, **kwargs):
