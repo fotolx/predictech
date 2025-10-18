@@ -108,58 +108,7 @@
             <div class="container container-layout">
                 <div class="map-section">
                     <div class="svg-container" id="main-svg-container"></div>
-                    <div class="wrapper-houses">
-                        <div class="wrapper-houses__item" data-house="svg-house-1">
-                            <a href="/situation/" class="wrapper-houses__link">
-                                <div class="wrapper-houses__header status-houses--normal">
-                                    <div class="wrapper-houses__text">№1 98&nbsp;кв</div>
-                                </div>
-                                <div class="wrapper-houses__body">
-                                    <div class="wrapper-houses__title">ул.Ангарская,</div>
-                                </div>
-                            </a>
-                        </div>
-                        <div class="wrapper-houses__item" data-house="svg-house-2">
-                            <a href="/situation/" class="wrapper-houses__link">
-                                <div class="wrapper-houses__header status-houses--normal">
-                                    <div class="wrapper-houses__text">№2 120&nbsp;кв</div>
-                                </div>
-                                <div class="wrapper-houses__body">
-                                    <div class="wrapper-houses__title">ул.Ангарская,</div>
-                                </div>
-                            </a>
-                        </div>
-                        <div class="wrapper-houses__item" data-house="svg-house-3">
-                            <a href="/situation/" class="wrapper-houses__link">
-                                <div class="wrapper-houses__header status-houses--warning">
-                                    <div class="wrapper-houses__text">№3 85&nbsp;кв</div>
-                                </div>
-                                <div class="wrapper-houses__body">
-                                    <div class="wrapper-houses__title">ул.Ангарская,</div>
-                                </div>
-                            </a>
-                        </div>
-                        <div class="wrapper-houses__item" data-house="svg-house-4">
-                            <a href="/situation/" class="wrapper-houses__link">
-                                <div class="wrapper-houses__header status-houses--criticals">
-                                    <div class="wrapper-houses__text">№4 75&nbsp;кв</div>
-                                </div>
-                                <div class="wrapper-houses__body">
-                                    <div class="wrapper-houses__title">ул.Ангарская,</div>
-                                </div>
-                            </a>
-                        </div>
-                        <div class="wrapper-houses__item" data-house="svg-house-5">
-                            <a href="/situation/" class="wrapper-houses__link">
-                                <div class="wrapper-houses__header status-houses--warning">
-                                    <div class="wrapper-houses__text">№5 110&nbsp;кв</div>
-                                </div>
-                                <div class="wrapper-houses__body">
-                                    <div class="wrapper-houses__title">ул.Ангарская,</div>
-                                </div>
-                            </a>
-                        </div>
-                    </div>
+                    <div class="wrapper-houses"></div>
                     <div id="notification"></div>
                     <div id="state-indicator"></div>
                     <div class="wrapper-map-controls">
@@ -208,8 +157,17 @@
     <script src="{% static 'js/notificationFilter.js' %}"></script>
     <script src="{% static 'js/report.js' %}"></script>
     <script src="{% static 'js/SVGMapHighlighter.js' %}"></script>
+    <script src="{% static 'js/houseDataLoader.js' %}"></script>
+    <script src="{% static 'js/updateModel.js' %}"></script>
+    <script src="{% static 'js/rangeSettingInit.js' %}"></script>
+    <script src="{% static 'js/sendFormRisks.js' %}"></script>
 </body>
 </html>
+
+
+
+
+
 
 
 
