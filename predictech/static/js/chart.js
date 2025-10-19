@@ -13,68 +13,105 @@
   const chart1Ids = [1, 5, 9, 13, 17];
   const chart2Ids = [2, 6, 10, 14, 18];
 
-  // Для маленьких графиков — метки 8 точек (4 прошлые, сейчас, +3 прогноза)
+  // Мелкие метки для "small" графиков (4 прошлые, сейчас, +3 прогноза)
   const smallLabels = ['-4 нед', '-3 нед', '-2 нед', '-1 нед', 'Сейчас', '+1 нед', '+2 нед', '+3 нед'];
 
-  // === Утилиты ===
-  function formatDate(d) { return String(d.getDate()).padStart(2, '0') + '.' + String(d.getMonth() + 1).padStart(2, '0') + '.' + d.getFullYear(); }
-  function safeNum(v) { if (v === null || v === undefined || v === '') return null; const n = Number(v); return Number.isFinite(n) ? n : null; }
+  // === УТИЛИТЫ / МЕЛКИЕ ФУНКЦИИ ===
 
+  // Форматируем дату DD.MM.YYYY
+  function formatDate(d) {
+    return String(d.getDate()).padStart(2, '0') + '.' +
+           String(d.getMonth() + 1).padStart(2, '0') + '.' +
+           d.getFullYear();
+  }
+
+  // Безопасное преобразование в число (null при невалидном)
+  function safeNum(v) {
+    if (v === null || v === undefined || v === '') return null;
+    const n = Number(v);
+    return Number.isFinite(n) ? n : null;
+  }
+
+  // Генерируем подписи дат для small (4 прошлые, сейчас, +3)
   function calculateWeekDates(pastWeeks = 4, futureWeeks = 3) {
-    const now = new Date(); const wk = 7 * 24 * 60 * 60 * 1000; const arr = [];
+    const now = new Date();
+    const wk = 7 * 24 * 60 * 60 * 1000;
+    const arr = [];
     for (let i = pastWeeks; i >= 1; i--) arr.push(formatDate(new Date(now.getTime() - i * wk)));
     arr.push(formatDate(now));
     for (let i = 1; i <= futureWeeks; i++) arr.push(formatDate(new Date(now.getTime() + i * wk)));
     return arr;
   }
 
+  // Генерируем подписи дат для расширенного графика (длиннее)
   function calculateWeekDatesExtended(pastWeeks = 10, futureWeeks = 10) {
-    const now = new Date(); const wk = 7 * 24 * 60 * 60 * 1000; const arr = [];
+    const now = new Date();
+    const wk = 7 * 24 * 60 * 60 * 1000;
+    const arr = [];
     for (let i = pastWeeks; i >= 1; i--) arr.push(formatDate(new Date(now.getTime() - i * wk)));
     arr.push(formatDate(now));
     for (let i = 1; i <= futureWeeks; i++) arr.push(formatDate(new Date(now.getTime() + i * wk)));
     return arr;
   }
 
-  // Попытки загрузки с прокси-фолбэком
+  // === FETCH С ПРОКСИ-ФОЛБЭКОМ ===
+  // Попытка прямого fetch, затем последовательно пробуем прокси
   async function fetchWithFallback(url, opts = {}) {
     try {
-      const r = await fetch(url, opts); if (!r.ok) throw new Error('HTTP ' + r.status); return await r.text();
-    } catch (e) { console.warn('Direct fetch failed:', e.message); }
+      const r = await fetch(url, opts);
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      return await r.text();
+    } catch (e) {
+      console.warn('Direct fetch failed:', e.message);
+    }
     for (const p of PROXIES) {
       try {
-        const r = await fetch(p + url, opts); if (!r.ok) continue; return await r.text();
-      } catch (e) { console.warn('Proxy failed:', p, e.message); }
+        const r = await fetch(p + url, opts);
+        if (!r.ok) continue;
+        return await r.text();
+      } catch (e) {
+        console.warn('Proxy failed:', p, e.message);
+      }
     }
     throw new Error('Не удалось загрузить: ' + url);
   }
 
+  // Парсер JSON, устойчивый к "обёрткам" (текст с массивом/объектом внутри)
   function parsePossiblyWrappedJson(txt) {
     const s = String(txt).trim();
-    try { return JSON.parse(s); } catch (_) {
-      const arr = s.match(/\[.*\]/s); if (arr) try { return JSON.parse(arr[0]); } catch (_) { }
-      const obj = s.match(/\{.*\}/s); if (obj) try { return JSON.parse(obj[0]); } catch (_) { }
+    try {
+      return JSON.parse(s);
+    } catch (_) {
+      const arr = s.match(/\[.*\]/s);
+      if (arr) try { return JSON.parse(arr[0]); } catch (_) {}
+      const obj = s.match(/\{.*\}/s);
+      if (obj) try { return JSON.parse(obj[0]); } catch (_) {}
     }
     throw new Error('JSON parse error');
   }
 
-  // === Загрузка данных ===
+  // === ЗАГРУЗКА ДАННЫХ ===
+
+  // --- Исторические данные (real data) ---
+  // Возвращает массив записей (полный список или parsed.results и т.п.)
   async function loadRealData() {
     const txt = await fetchWithFallback(REAL_DATA_URL, { mode: 'cors' });
     const parsed = parsePossiblyWrappedJson(txt);
-    // Парсим в массив записей
     if (Array.isArray(parsed)) return parsed;
     if (parsed && Array.isArray(parsed.results)) return parsed.results;
-    // возможно вложенный объект с массивом
     for (const k of Object.keys(parsed || {})) if (Array.isArray(parsed[k])) return parsed[k];
-    // иначе оборачиваем одиночный объект
     return [parsed];
   }
 
+  // --- Прогноз (forecast) ---
+  // Возвращает объект вида:
+  // { 1: [v1, v2, v3], 2: [...], 3: [...], 4: [...] }
+  // Для потоков (1,2) значения умножаются на 1000 как у вас было.
   async function loadForecast() {
     const txt = await fetchWithFallback(FORECAST_URL, { mode: 'cors' });
     const parsed = parsePossiblyWrappedJson(txt);
-    // Если приходят массивы — выберем самый свежий по timestamp (на всякий случай)
+
+    // Если приходят несколько записей — выбираем самую свежую по timestamp
     let src = null;
     if (Array.isArray(parsed)) src = parsed.reduce((acc, it) => {
       const ts = it.timestamp || (it.fields && it.fields.timestamp) || '';
@@ -88,6 +125,8 @@
 
     const fields = src.fields ? src.fields : src;
     const p = name => safeNum(fields[name]);
+
+    // Маппинг полей (как в вашем оригинале)
     return {
       1: [p('flow_xvs_168'), p('flow_xvs_336'), p('flow_xvs_504')].map(v => v != null ? v * 1000 : null),
       2: [p('flow_gvs_168'), p('flow_gvs_336'), p('flow_gvs_504')].map(v => v != null ? v * 1000 : null),
@@ -96,12 +135,15 @@
     };
   }
 
-  // === Агрегация исторических данных по неделям ===
+  // === ИСТОРИЧЕСКАЯ ОБРАБОТКА: агрегация по неделям ===
+  // realData — массив записей; pastWeeks задаёт глубину (по умолчанию 10)
+  // Возвращает объект {1:[],2:[],3:[],4:[]} длины pastWeeks+1 (0 — самая старая, pastWeeks — сейчас)
   function aggregateByWeeks(realData, pastWeeks = 10) {
-    // Вернёт объект {1:[],2:[],3:[],4:[]} длины pastWeeks+1
     const wk = 7 * 24 * 60 * 60 * 1000;
     const now = Date.now();
     const len = pastWeeks + 1;
+
+    // sums и counts для агрегирования
     const sums = { 1: Array(len).fill(0), 2: Array(len).fill(0), 3: Array(len).fill(0), 4: Array(len).fill(0) };
     const counts = { 1: Array(len).fill(0), 2: Array(len).fill(0), 3: Array(len).fill(0), 4: Array(len).fill(0) };
 
@@ -112,70 +154,95 @@
       const tsStr = f.timestamp || f.time || f.date;
       if (!id || val === null || !tsStr) continue;
       if (!chart1Ids.includes(id) && !chart2Ids.includes(id) && id !== 3 && id !== 4) continue;
+
       const dt = new Date(tsStr);
       if (isNaN(dt)) continue;
+
       const weeksAgo = Math.floor((now - dt.getTime()) / wk);
       if (weeksAgo < 0 || weeksAgo > pastWeeks) continue;
-      const idx = pastWeeks - weeksAgo; // 0..pastWeeks (0 — oldest)
+
+      // индексы: 0 — самая старая, len-1 — сейчас
+      const idx = pastWeeks - weeksAgo;
       const target = chart1Ids.includes(id) ? 1 : (chart2Ids.includes(id) ? 2 : id);
       sums[target][idx] += val;
       counts[target][idx] += 1;
     }
 
+    // Формируем финальный массив — для потоков суммируем, для темп. — среднее
     const out = {};
-    [1, 2, 3, 4].forEach(id => {
+    [1,2,3,4].forEach(id => {
       out[id] = Array(len).fill(null);
       for (let i = 0; i < len; i++) {
         if (counts[id][i] === 0) { out[id][i] = null; continue; }
-        if (id === 1 || id === 2) out[id][i] = Number(sums[id][i].toFixed(3)); // суммируем потоки
-        else out[id][i] = Number((sums[id][i] / counts[id][i]).toFixed(2)); // средняя температура
+        if (id === 1 || id === 2) out[id][i] = Number(sums[id][i].toFixed(3));
+        else out[id][i] = Number((sums[id][i] / counts[id][i]).toFixed(2));
       }
     });
     return out;
   }
 
-  // === Экстраполяция прогноза на futureWeeks ===
+  // === ПРОГНОЗНАЯ ОБРАБОТКА: экстраполяция/расширение прогноза на большее количество недель ===
+  // fmap: { id: [v1(+1), v2(+2), v3(+3)] }
+  // Возвращает {id: [val0, val1, ..., valFutureWeeks-1]} длины futureWeeks
   function extrapolateForecast(fmap, futureWeeks = 10) {
-    // fmap: {id: [v1(+1), v2(+2), v3(+3)]}
     const out = {};
-    [1, 2, 3, 4].forEach(id => {
+    [1,2,3,4].forEach(id => {
       const base = Array.from((fmap && fmap[id]) || []);
       const res = Array(futureWeeks).fill(null);
-      for (let i = 0; i < Math.min(base.length, futureWeeks); i++) res[i] = base[i] != null ? base[i] : null;
-      // попытка линейной экстраполяции на основе последних двух известных
+
+      // Сначала копируем те значения, которые есть в forecast (обычно 3 значения)
+      for (let i = 0; i < Math.min(base.length, futureWeeks); i++) {
+        res[i] = base[i] != null ? base[i] : null;
+      }
+
+      // Соберём список известных (index, value)
       const known = [];
       for (let i = 0; i < base.length; i++) if (base[i] != null) known.push({ i: i, v: base[i] });
+
+      // Если есть >=2 известных — делаем линейную экстраполяцию на основе двух последних известных
       if (known.length >= 2) {
         const a = known[known.length - 2], b = known[known.length - 1];
         const step = (b.v - a.v) / (b.i - a.i);
         for (let k = b.i + 1; k < futureWeeks; k++) {
           let val = b.v + step * (k - b.i);
-          // округление для читаемости: если в базе были дроби сохраняем 2 знака, иначе целое
+          // Округляем: если в данных есть дроби — 2 знака, иначе целое
           const places = (String(b.v).includes('.') || String(a.v).includes('.')) ? 2 : 0;
           res[k] = Number(val.toFixed(places));
         }
       } else if (known.length === 1) {
+        // Если только 1 известное — просто заполняем им все последующие недели (const)
         for (let k = known[0].i + 1; k < futureWeeks; k++) res[k] = known[0].v;
       }
+      // Если нет известных — останутся null
       out[id] = res;
     });
     return out;
   }
 
-  // === Формируем данные для маленьких и расширенных графиков ===
+  // === ФОРМИРУЕМ ДАННЫЕ ДЛЯ SMALL И EXTENDED ГРАФИКОВ ===
   async function processChartData(pastWeeks = 10, futureWeeks = 10) {
+    // Загружаем параллельно реальные данные и прогноз (параллель, но обработаем ошибки)
     const [realP, forecastP] = await Promise.allSettled([loadRealData(), loadForecast()]);
+
     if (realP.status !== 'fulfilled') throw new Error('Ошибка загрузки реальных данных: ' + (realP.reason?.message || realP.reason));
     const realData = realP.value;
-    const forecastMap = forecastP.status === 'fulfilled' ? forecastP.value : { 1: [null, null, null], 2: [null, null, null], 3: [null, null, null], 4: [null, null, null] };
 
-    // --- small (8 точек: 4 прошлые + сейчас + 3 прогноза)
+    // forecastMap — если не загрузился прогноз, используем пустой шаблон (3 ячейки)
+    const forecastMap = forecastP.status === 'fulfilled'
+      ? forecastP.value
+      : { 1: [null, null, null], 2: [null, null, null], 3: [null, null, null], 4: [null, null, null] };
+
+    // -------------------------
+    // 1) BUILD SMALL (8 точек: 4 прошлые + Сейчас + 3 прогноза)
+    // -------------------------
     const small = (function buildSmall() {
-      const wk = 7 * 24 * 60 * 60 * 1000; const now = Date.now();
-      const historyLen = 5; // 4 прошлые + сейчас
+      const wk = 7 * 24 * 60 * 60 * 1000;
+      const now = Date.now();
+      const historyLen = 5; // 4 прошлые + "Сейчас"
       const sums = { 1: Array(historyLen).fill(0), 2: Array(historyLen).fill(0), 3: Array(historyLen).fill(0), 4: Array(historyLen).fill(0) };
       const counts = { 1: Array(historyLen).fill(0), 2: Array(historyLen).fill(0), 3: Array(historyLen).fill(0), 4: Array(historyLen).fill(0) };
 
+      // --- ИСТОРИЧЕСКАЯ ЧАСТЬ small: пробегаем реальные записи и агрегируем по неделям (0..4)
       for (const it of realData) {
         const f = it.fields ? it.fields : it;
         const id = Number(f.detector_id || f.detectorId || f.id || f.detector);
@@ -183,7 +250,8 @@
         const ts = f.timestamp || f.time || f.date;
         if (!id || val === null || !ts) continue;
         if (!chart1Ids.includes(id) && !chart2Ids.includes(id) && id !== 3 && id !== 4) continue;
-        const dt = new Date(ts); if (isNaN(dt)) continue;
+        const dt = new Date(ts);
+        if (isNaN(dt)) continue;
         const weeksAgo = Math.floor((now - dt.getTime()) / wk);
         if (weeksAgo < 0 || weeksAgo > 4) continue;
         const idx = 4 - weeksAgo; // 0..4
@@ -192,13 +260,14 @@
         counts[target][idx] += 1;
       }
 
+      // Формируем итоговый small (8 точек) — первые 5 из истории, последние 3 из forecastMap
       const out = { 1: Array(8).fill(null), 2: Array(8).fill(null), 3: Array(8).fill(null), 4: Array(8).fill(null) };
-      [1, 2, 3, 4].forEach(id => {
+      [1,2,3,4].forEach(id => {
         for (let i = 0; i < 5; i++) {
           if (counts[id][i] === 0) out[id][i] = null;
           else out[id][i] = (id === 1 || id === 2) ? Number(sums[id][i].toFixed(3)) : Number((sums[id][i] / counts[id][i]).toFixed(2));
         }
-        // прогнозные 3
+        // --- ПРОГНОЗЫ для small: берем из forecastMap (3 значения)
         out[id][5] = forecastMap[id] && forecastMap[id][0] !== undefined ? forecastMap[id][0] : null;
         out[id][6] = forecastMap[id] && forecastMap[id][1] !== undefined ? forecastMap[id][1] : null;
         out[id][7] = forecastMap[id] && forecastMap[id][2] !== undefined ? forecastMap[id][2] : null;
@@ -207,23 +276,29 @@
       return out;
     })();
 
-    // --- extended (история pastWeeks + прогноз futureWeeks)
-    const historical = aggregateByWeeks(realData, pastWeeks); // length pastWeeks+1
-    const forecastExtended = extrapolateForecast(forecastMap, futureWeeks); // length futureWeeks
+    // -------------------------
+    // 2) EXTENDED: история pastWeeks+1 + прогноз futureWeeks (экстраполяция)
+    // -------------------------
+    const historical = aggregateByWeeks(realData, pastWeeks); // ИСТОРИЧЕСКИЕ данные (pastWeeks+1 длина)
+    const forecastExtended = extrapolateForecast(forecastMap, futureWeeks); // ПРОГНОЗ расширенный (futureWeeks длина)
     const extLen = pastWeeks + 1 + futureWeeks;
     const extended = {};
-    [1, 2, 3, 4].forEach(id => {
+    [1,2,3,4].forEach(id => {
       extended[id] = Array(extLen).fill(null);
-      // копируем историю (0..pastWeeks)
-      for (let i = 0; i <= pastWeeks; i++) extended[id][i] = (historical[id] && historical[id][i] !== undefined) ? historical[id][i] : null;
+      // копируем историю (индексы 0..pastWeeks)
+      for (let i = 0; i <= pastWeeks; i++) {
+        extended[id][i] = (historical[id] && historical[id][i] !== undefined) ? historical[id][i] : null;
+      }
       // копируем прогноз (pastWeeks+1 .. end)
-      for (let j = 0; j < futureWeeks; j++) extended[id][pastWeeks + 1 + j] = (forecastExtended[id] && forecastExtended[id][j] !== undefined) ? forecastExtended[id][j] : null;
+      for (let j = 0; j < futureWeeks; j++) {
+        extended[id][pastWeeks + 1 + j] = (forecastExtended[id] && forecastExtended[id][j] !== undefined) ? forecastExtended[id][j] : null;
+      }
     });
 
     return { small, extended };
   }
 
-  // === Chart helpers ===
+  // === CHART HELPERS (не меняем) ===
   const nowLinePlugin = {
     id: 'nowLineSmall',
     afterDraw(chart) {
@@ -249,7 +324,7 @@
     };
   }
 
-  // Создание маленького графика
+  // Создание маленького графика (small)
   function createSmallChart(canvasId, datasets, unitType) {
     const canvas = document.getElementById(canvasId); if (!canvas) return null;
     const ctx = canvas.getContext('2d');
@@ -320,15 +395,13 @@
         tension: 0.25,
         pointRadius: 3,
         spanGaps: true
-        // segment.borderDash будем задавать при создании модального окна исходя из centerIndex
       };
     });
   }
 
-  // === МОДАЛЬНЫЙ ГРАФИК ===
+  // === МОДАЛЬНЫЙ ГРАФИК === (openModal / closeModal — логика та же, с комментариями)
   let currentModal = null;
   function openModal(payload) {
-    // payload: { datasets, labelsArray, weekDates, title, unitType, pastWeeks, centerIndex }
     if (!payload) return;
     closeModal();
 
@@ -368,19 +441,18 @@
     document.addEventListener('keydown', onKey);
 
     function closeModalInner() {
-      if (currentModal && currentModal.chart) try { currentModal.chart.destroy(); } catch (_) { }
-      try { document.removeEventListener('keydown', onKey); } catch (_) { }
-      try { overlay.remove(); } catch (_) { }
+      if (currentModal && currentModal.chart) try { currentModal.chart.destroy(); } catch (_) {}
+      try { document.removeEventListener('keydown', onKey); } catch (_) {}
+      try { overlay.remove(); } catch (_) {}
       currentModal = null;
     }
     window._closeChartModal = closeModalInner;
 
-    // Установим segment.borderDash: исторические точки (индексы <= centerIndex) — сплошные, прогноз — штрих
+    // Устанавливаем сегменты: исторические точки (<= centerIndex) — сплошные, прогноз (> centerIndex) — штрих
     const centerIndex = payload.centerIndex;
     const datasetsForChart = payload.datasets.map(ds => {
       const copy = { ...ds };
       copy.segment = {
-        // Если p1DataIndex > centerIndex — считаем сегмент прогнозным => штрих
         borderDash: ctx => {
           try { return (ctx && ctx.p1DataIndex > centerIndex) ? [6, 4] : []; } catch { return []; }
         }
@@ -428,10 +500,10 @@
   }
 
   function closeModal() {
-    try { window._closeChartModal && window._closeChartModal(); } catch (_) { }
+    try { window._closeChartModal && window._closeChartModal(); } catch (_) {}
   }
 
-  // === Хранилище для модальных данных и биндинг кликов ===
+  // === МОДАЛЬНЫЕ ДАННЫЕ И БИНДИНГ КЛИКОВ ===
   const modalStore = {}; // key -> payload
   function bindClick(canvasId, key) {
     const el = document.getElementById(canvasId); if (!el) return;
@@ -442,13 +514,13 @@
     });
   }
 
-  // === Инициализация ===
+  // === ИНИЦИАЛИЗАЦИЯ ===
   async function initialize() {
     try {
       const pastWeeks = 10, futureWeeks = 10;
       const { small, extended } = await processChartData(pastWeeks, futureWeeks);
 
-      // chart1 (flow XVS)
+      // chart1 (flow XVS) — small + modal payload
       const ds1 = prepareSmallDatasets(small, [1], ['#3b82f6'], ['Общее потребление ХВС, м³']);
       createSmallChart('chart1', ds1, 'flow');
       const extDs1 = prepareExtendedDatasets(extended, [1], ['#3b82f6'], ['Общее потребление ХВС, м³']);
@@ -483,9 +555,9 @@
       bindClick('chart2', 'chart2');
 
       // chart3 (подача/обратка)
-      const ds3 = prepareSmallDatasets(small, [3, 4], ['#1e40af', '#a855f7'], ['Подача', 'Обратка']);
+      const ds3 = prepareSmallDatasets(small, [3,4], ['#1e40af','#a855f7'], ['Подача','Обратка']);
       createSmallChart('chart3', ds3, 'temp');
-      const extDs3 = prepareExtendedDatasets(extended, [3, 4], ['#1e40af', '#a855f7'], ['Подача', 'Обратка']);
+      const extDs3 = prepareExtendedDatasets(extended, [3,4], ['#1e40af','#a855f7'], ['Подача','Обратка']);
       modalStore['chart3'] = {
         datasets: extDs3,
         unitType: 'temp',
@@ -516,7 +588,7 @@
       };
       createSmallChart('chart4', [...dsT1, ...dsT2, avgDataset], 'temp');
 
-      // extended for chart4
+      // extended for chart4 (расширенная средняя)
       const extT1 = prepareExtendedDatasets(extended, [3], ['#a855f7'], ['T1 (подача)'])[0];
       const extT2 = prepareExtendedDatasets(extended, [4], ['#3b82f6'], ['T2 (обратка)'])[0];
       const extLen = extended[3].length;
@@ -546,7 +618,7 @@
     }
   }
 
-  // Запуск
+  // Запуск (ждём DOMContentLoaded если надо)
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', initialize);
   else initialize();
 
