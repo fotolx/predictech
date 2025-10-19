@@ -167,7 +167,7 @@ class HouseDataLoader {
         const address = houseData.fields?.address || 'Адрес не указан';
 
         houseItem.innerHTML = `
-            <a href="#" class="wrapper-houses__link">
+            <a href="/situation/" class="wrapper-houses__link">
                 <div class="wrapper-houses__header ${statusClass}">
                     <div class="wrapper-houses__text">№${houseNumber} ${area}&nbsp;кв</div>
                 </div>
@@ -218,4 +218,5 @@ class HouseDataLoader {
 }
 
 // Создаем экземпляр класса
+
 new HouseDataLoader();
