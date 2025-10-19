@@ -25,7 +25,25 @@ import joblib
 import json
 
 def home(request):
-    return render(request, 'index.html')
+    flow_xvs = 0
+    flow_gvs = 0
+    temp_supply = 0
+    temp_return = 0
+    temp_counter = 0
+    all_detectors = DetectorsAtHouse.objects.all()
+    for detector in all_detectors:
+        detector_data = DetectorData.objects.filter(detector_id=detector.detector_id.id).last()
+        if detector.name == "flow_xvs":
+            flow_xvs = flow_xvs + detector_data.value
+        if detector.name == "flow_gvs":
+            flow_gvs = flow_gvs + detector_data.value
+        if detector.name == "temp_supply":
+            temp_supply = temp_supply + detector_data.value
+        if detector.name == "temp_return":
+            temp_return = temp_return + detector_data.value
+            temp_counter = temp_counter + 1
+    
+    return render(request, 'index.html', {'flow_xvs': round(flow_xvs*100), 'flow_gvs': round(flow_gvs*100), 'percent': round(flow_gvs/flow_xvs*100), 'temp': temp_supply/temp_counter})
 
 class JournalView(View):
     def get(self, request, *args, **kwargs):
