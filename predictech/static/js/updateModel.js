@@ -1,4 +1,3 @@
-// === Конфигурация ===
 const UPDATE_CONFIG = {
     jsonUrl: 'https://predictech.5d4.ru/train_model/?house_id=2',
     startDelay: 5500, // ms перед первым запросом
@@ -416,5 +415,6 @@ window.UpdateManager = {
     createPreloader,
     removePreloader
 };
+
 
 
