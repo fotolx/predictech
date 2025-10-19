@@ -207,9 +207,9 @@
     color: #4b5563;
 }
 
-.date-m,
-.accuracy-m,
-.improvement-m {
+#date-m,
+#accuracy-m,
+#improvement-m {
     font-size: 12px;
 }
 
@@ -701,4 +701,5 @@ input[type="range"]::-ms-thumb {
     opacity: 0;
     pointer-events: none;
 }
+
 
