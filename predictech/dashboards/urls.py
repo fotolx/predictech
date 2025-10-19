@@ -20,4 +20,5 @@ urlpatterns = [
     path('forecast/', forecast, name='forecast'),
     path('dahdl/', DetectorsAtHouseDataView.as_view(), name="detectors_at_house_data_log"),
     path('risks/', RisksValuesView.as_view(), name="risks"),
+    path('m/', mobile, name="mobile"),
 ]

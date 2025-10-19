@@ -1,0 +1,172 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Мобильное приложение</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: #000;
+            overflow-x: hidden;
+            /* Добавляем отступ снизу для основного контента */
+            padding-bottom: 80px;
+            /* Центрируем контент по горизонтали */
+            display: flex;
+            justify-content: center;
+            min-height: 100vh;
+        }
+
+        .mobile-container {
+            width: 100%;
+            max-width: 414px; /* Ширина iPhone 6/7/8 Plus */
+            position: relative;
+            background: #000;
+            box-shadow: 0 0 20px rgba(255, 255, 255, 0.1);
+            min-height: 100vh;
+        }
+
+        .screenshot {
+            width: 100%;
+            height: auto;
+            display: block;
+        }
+
+        /* Стили для фиксированного меню внизу - РАСТЯНУТО НА ВСЮ ШИРИНУ */
+        .bottom-menu {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            z-index: 1000;
+            background: #000;
+            padding: 10px 0;
+            box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.5);
+            display: flex;
+            justify-content: center;
+        }
+
+        .menu-content {
+            width: 100%;
+            max-width: 414px;
+        }
+
+        .menu-image {
+            width: 100%;
+            height: auto;
+            display: block;
+            max-height: 60px;
+            object-fit: contain;
+        }
+
+        /* Опционально: индикатор загрузки */
+        .loading {
+            color: #fff;
+            text-align: center;
+            padding: 20px;
+            font-family: Arial, sans-serif;
+        }
+
+        /* Декоративные элементы для имитации мобильного устройства (опционально) */
+        .device-frame {
+            position: relative;
+        }
+
+        .device-frame::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 20px;
+            background: #000;
+            border-bottom-left-radius: 10px;
+            border-bottom-right-radius: 10px;
+            z-index: 10;
+        }
+
+        /* Медиа-запрос для больших экранов */
+        @media (min-width: 415px) {
+            body {
+                padding: 20px 0;
+                background: #222;
+            }
+            
+            .mobile-container {
+                border-radius: 20px;
+                overflow: hidden;
+                min-height: calc(100vh - 40px);
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="mobile-container device-frame">
+        <!-- Замените src на путь к вашему основному изображению -->
+        <img class="screenshot" src="{% static 'img/main_screen.jpeg' %}" alt="Скриншот приложения">
+        
+        <!-- Опционально: сообщение при загрузки -->
+        <div class="loading" id="loading">
+            Загрузка изображения...
+        </div>
+    </div>
+
+    <!-- Фиксированное меню внизу - РАСТЯНУТО НА ВСЮ ШИРИНУ ЭКРАНА -->
+    <div class="bottom-menu">
+        <div class="menu-content">
+            <!-- Замените src на путь к изображению меню -->
+            <img class="menu-image" src="{% static 'img/mobile_menu.jpeg' %}" alt="Меню приложения">
+        </div>
+    </div>
+
+    <script>
+        // Скрипт для скрытия индикатора загрузки и настройки отступов
+        window.addEventListener('load', function() {
+            const loading = document.getElementById('loading');
+            if (loading) {
+                loading.style.display = 'none';
+            }
+            
+            // Автоматическая подстройка отступа под высоту меню
+            const menu = document.querySelector('.bottom-menu');
+            const menuImage = document.querySelector('.menu-image');
+            const mobileContainer = document.querySelector('.mobile-container');
+            
+            if (menu && menuImage && mobileContainer) {
+                // Ждем загрузки изображения меню
+                menuImage.addEventListener('load', function() {
+                    const menuHeight = menu.offsetHeight;
+                    document.body.style.paddingBottom = menuHeight + 'px';
+                    mobileContainer.style.paddingBottom = menuHeight + 'px';
+                });
+                
+                // На случай если изображение уже загружено
+                if (menuImage.complete) {
+                    const menuHeight = menu.offsetHeight;
+                    document.body.style.paddingBottom = menuHeight + 'px';
+                    mobileContainer.style.paddingBottom = menuHeight + 'px';
+                }
+            }
+        });
+        
+        // Центрирование на мобильных устройствах с учетом безопасных зон
+        function updateSafeArea() {
+            const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+            if (isMobile) {
+                document.body.style.paddingLeft = 'env(safe-area-inset-left)';
+                document.body.style.paddingRight = 'env(safe-area-inset-right)';
+                document.body.style.paddingBottom = 'calc(env(safe-area-inset-bottom) + ' + document.querySelector('.bottom-menu').offsetHeight + 'px)';
+            }
+        }
+        
+        window.addEventListener('resize', updateSafeArea);
+        updateSafeArea();
+    </script>
+</body>
+</html>

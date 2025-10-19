@@ -24,6 +24,9 @@ import os
 import joblib
 import json
 
+def mobile(request):
+    return render(request, 'mobile.html')   
+
 def home(request):
     flow_xvs = 0
     flow_gvs = 0
