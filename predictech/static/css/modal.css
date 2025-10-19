@@ -202,15 +202,9 @@
 .training-date,
 .model-accuracy,
 .accuracy-improvement {
-    font-size: 12px;
+    font-size: 14px;
     line-height: 133%;
     color: #4b5563;
-}
-
-#date-m,
-#accuracy-m,
-#improvement-m {
-    font-size: 12px;
 }
 
 .title-risk {
@@ -701,5 +695,6 @@ input[type="range"]::-ms-thumb {
     opacity: 0;
     pointer-events: none;
 }
+
 
 
