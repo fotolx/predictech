@@ -1,6 +1,6 @@
 /**
  * RiskSettingsLoader
- * Авто-заполнение формы /risks/ значениями с https://predictech.5d4.ru/risks
+ * Принимаем данные с формы /risks/ значениями с https://predictech.5d4.ru/risks по GET запросу
  */
 class RiskSettingsLoader {
   constructor(opts = {}) {
@@ -60,7 +60,7 @@ class RiskSettingsLoader {
       };
       check();
 
-      // Дополнительно, на всякий случай наблюдаем за вставкой элементов (если желательно — можно убрать)
+      // Дополнительно, на всякий случай наблюдаем за вставкой элементов
       const mo = new MutationObserver(() => {
         const el = document.querySelector(this.formSelector);
         if (el) {
@@ -105,7 +105,7 @@ class RiskSettingsLoader {
         } catch (errProxy) {
           console.warn(`RiskSettingsLoader: Proxy ${proxy} не сработал:`, errProxy.message);
           // дальше пробуем следующий прокси
-          await this.sleep(400); // небольшая пауза, чтобы не "флудить"
+          await this.sleep(400); 
         }
       }
       throw new Error('RiskSettingsLoader: Не удалось загрузить данные (все варианты провалились)');
@@ -117,7 +117,6 @@ class RiskSettingsLoader {
     if (raw === null || raw === undefined) throw new Error('Пустой ответ сервера');
     if (typeof raw === 'object') return raw;
 
-    // raw = строка -> попробуем распарсить в JSON разными способами
     let text = String(raw).trim();
 
     // Если на странице прилетел JSONP или есть лишние символы — извлечём JSON-подстроку
@@ -181,7 +180,7 @@ class RiskSettingsLoader {
         try {
           // если это <input type="range"> или number - присваиваем value
           input.value = (value !== undefined && value !== null) ? String(value) : input.value;
-          // Обновим aria-атрибуты если есть
+
           if (input.hasAttribute('aria-valuenow')) {
             input.setAttribute('aria-valuenow', input.value);
           }
@@ -198,13 +197,12 @@ class RiskSettingsLoader {
       listForConsole.push({ name, value: value === undefined ? null : value });
     });
 
-    // Дополнительно — обновим видимый спан с id="sensitivity-value", если он есть
     const sensSpan = document.getElementById('sensitivity-value');
     const sensInput = form.querySelector('[name="sensivity"], #sensitivity, input[type="range"][name="sensivity"]');
 
     if (sensInput) {
       const v = sensInput.value || this.findValueByName(dataObj, 'sensivity') || sensInput.getAttribute('value') || sensInput.defaultValue;
-      // форматируем до 1 знака после запятой (1.0) — в тексте используем запятую, если предпочитаете точку — замените
+      // форматируем до 1 знака после запятой (1.0) — в тексте используем запятую
       const formatted = (Number.isFinite(+v)) ? (+v).toFixed(1).replace('.', ',') : String(v);
       if (sensSpan) sensSpan.textContent = formatted.replace(',', '.'); // оставим точку чтобы совпадало с исходным span вида "1" / "1.2"
       // обновим aria
@@ -214,7 +212,7 @@ class RiskSettingsLoader {
       sensInput.dispatchEvent(new Event('change', { bubbles: true }));
     }
 
-    // Выводим (короткий) список полученных данных в консоль, как просили
+    // Выводим (короткий) список полученных данных в консоль
     console.log('RiskSettingsLoader: Список значений для формы:', listForConsole);
   }
 
@@ -248,7 +246,5 @@ class RiskSettingsLoader {
 
   sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 }
-
-// Инициализация
-// Если нужно настроить параметры — передайте объект: new RiskSettingsLoader({ url: '...', formSelector: '...' })
 new RiskSettingsLoader();
+
