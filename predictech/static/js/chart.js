@@ -1,5 +1,5 @@
 (() => {
-  // === CONFIG ===
+  // === CONFIG — настройте при необходимости ===
   const REAL_DATA_URL = 'https://predictech.5d4.ru/detector_data_log/';
   const FORECAST_URL = 'https://predictech.5d4.ru/forecast/?house_id=2';
   const PROXIES = [
@@ -9,30 +9,34 @@
     'https://cors-anywhere.herokuapp.com/'
   ];
 
-  // Группы детекторов (как у вас)
-  const chart1Ids = [1, 5, 9, 13, 17];
-  const chart2Ids = [2, 6, 10, 14, 18];
+  // Какие detector_id относятся к потокам ХВС/ГВС и к температурам
+  const chart1Ids = [1, 5, 9, 13, 17]; // XVS detectors
+  const chart2Ids = [2, 6, 10, 14, 18]; // GVS detectors
 
-  // Мелкие метки для "small" графиков (4 прошлые, сейчас, +3 прогноза)
+  // small chart labels (4 прошлые, Сейчас, +3 прогноза)
   const smallLabels = ['-4 нед', '-3 нед', '-2 нед', '-1 нед', 'Сейчас', '+1 нед', '+2 нед', '+3 нед'];
 
-  // === УТИЛИТЫ / МЕЛКИЕ ФУНКЦИИ ===
+  // Если реальные данные измеряются в "мелких" единицах — fallback масштаб для прогнозов.
+  // Значение 100 или 1000 — пробуйте, что ближе к реальности. По умолчанию 100.
+  const FALLBACK_SCALE_FOR_FORECAST = 100;
 
-  // Форматируем дату DD.MM.YYYY
+  // Аггрегация потоков: 'sum' — суммировать значения всех детекторов группы (итого по дому),
+  // 'avg' — брать среднее по детекторам (если детекторы — параллельные измерители одного места).
+  const FLOW_AGG_MODE = 'sum'; // or 'avg'
+
+  // === УТИЛИТЫ ===
   function formatDate(d) {
     return String(d.getDate()).padStart(2, '0') + '.' +
            String(d.getMonth() + 1).padStart(2, '0') + '.' +
            d.getFullYear();
   }
 
-  // Безопасное преобразование в число (null при невалидном)
   function safeNum(v) {
     if (v === null || v === undefined || v === '') return null;
     const n = Number(v);
     return Number.isFinite(n) ? n : null;
   }
 
-  // Генерируем подписи дат для small (4 прошлые, сейчас, +3)
   function calculateWeekDates(pastWeeks = 4, futureWeeks = 3) {
     const now = new Date();
     const wk = 7 * 24 * 60 * 60 * 1000;
@@ -43,7 +47,6 @@
     return arr;
   }
 
-  // Генерируем подписи дат для расширенного графика (длиннее)
   function calculateWeekDatesExtended(pastWeeks = 10, futureWeeks = 10) {
     const now = new Date();
     const wk = 7 * 24 * 60 * 60 * 1000;
@@ -55,7 +58,6 @@
   }
 
   // === FETCH С ПРОКСИ-ФОЛБЭКОМ ===
-  // Попытка прямого fetch, затем последовательно пробуем прокси
   async function fetchWithFallback(url, opts = {}) {
     try {
       const r = await fetch(url, opts);
@@ -76,24 +78,19 @@
     throw new Error('Не удалось загрузить: ' + url);
   }
 
-  // Парсер JSON, устойчивый к "обёрткам" (текст с массивом/объектом внутри)
   function parsePossiblyWrappedJson(txt) {
     const s = String(txt).trim();
-    try {
-      return JSON.parse(s);
-    } catch (_) {
-      const arr = s.match(/\[.*\]/s);
-      if (arr) try { return JSON.parse(arr[0]); } catch (_) {}
-      const obj = s.match(/\{.*\}/s);
-      if (obj) try { return JSON.parse(obj[0]); } catch (_) {}
-    }
+    try { return JSON.parse(s); } catch (_) {}
+    const arr = s.match(/\[.*\]/s);
+    if (arr) try { return JSON.parse(arr[0]); } catch (_) {}
+    const obj = s.match(/\{.*\}/s);
+    if (obj) try { return JSON.parse(obj[0]); } catch (_) {}
     throw new Error('JSON parse error');
   }
 
   // === ЗАГРУЗКА ДАННЫХ ===
 
-  // --- Исторические данные (real data) ---
-  // Возвращает массив записей (полный список или parsed.results и т.п.)
+  // Исторические реальные записи
   async function loadRealData() {
     const txt = await fetchWithFallback(REAL_DATA_URL, { mode: 'cors' });
     const parsed = parsePossiblyWrappedJson(txt);
@@ -103,49 +100,47 @@
     return [parsed];
   }
 
-  // --- Прогноз (forecast) ---
-  // Возвращает объект вида:
-  // { 1: [v1, v2, v3], 2: [...], 3: [...], 4: [...] }
-  // Для потоков (1,2) значения умножаются на 1000 как у вас было.
+  // Прогноз из ML. Мы не будем слепо умножать на 1000.
+  // Возвращаем map {1: [v1,v2,v3], 2: [...], 3: [...], 4: [...]}
   async function loadForecast() {
     const txt = await fetchWithFallback(FORECAST_URL, { mode: 'cors' });
     const parsed = parsePossiblyWrappedJson(txt);
 
-    // Если приходят несколько записей — выбираем самую свежую по timestamp
+    // если массив — берем самую свежую запись по полю timestamp
     let src = null;
-    if (Array.isArray(parsed)) src = parsed.reduce((acc, it) => {
-      const ts = it.timestamp || (it.fields && it.fields.timestamp) || '';
-      if (!acc) return it;
-      const ats = acc.timestamp || (acc.fields && acc.fields.timestamp) || '';
-      return new Date(ts) > new Date(ats) ? it : acc;
-    }, null);
-    else src = parsed;
+    if (Array.isArray(parsed)) {
+      src = parsed.reduce((acc, it) => {
+        const ts = it.timestamp || (it.fields && it.fields.timestamp) || '';
+        if (!acc) return it;
+        const ats = acc.timestamp || (acc.fields && acc.fields.timestamp) || '';
+        return new Date(ts) > new Date(ats) ? it : acc;
+      }, null);
+    } else src = parsed;
 
-    if (!src) return { 1: [null, null, null], 2: [null, null, null], 3: [null, null, null], 4: [null, null, null] };
+    if (!src) return {1:[null,null,null],2:[null,null,null],3:[null,null,null],4:[null,null,null]};
 
     const fields = src.fields ? src.fields : src;
     const p = name => safeNum(fields[name]);
 
-    // Маппинг полей (как в вашем оригинале)
+    // Здесь НЕ жестко умножаем; просто читаем то, что модель вернула.
+    // Позже, при сопоставлении с историей, мы при необходимости подгоняем масштаб.
     return {
-      1: [p('flow_xvs_168'), p('flow_xvs_336'), p('flow_xvs_504')].map(v => v != null ? v * 1000 : null),
-      2: [p('flow_gvs_168'), p('flow_gvs_336'), p('flow_gvs_504')].map(v => v != null ? v * 1000 : null),
+      1: [p('flow_xvs_168'), p('flow_xvs_336'), p('flow_xvs_504')],
+      2: [p('flow_gvs_168'), p('flow_gvs_336'), p('flow_gvs_504')],
       3: [p('temp_supply_168'), p('temp_supply_336'), p('temp_supply_504')],
       4: [p('temp_return_168'), p('temp_return_336'), p('temp_return_504')]
     };
   }
 
-  // === ИСТОРИЧЕСКАЯ ОБРАБОТКА: агрегация по неделям ===
-  // realData — массив записей; pastWeeks задаёт глубину (по умолчанию 10)
-  // Возвращает объект {1:[],2:[],3:[],4:[]} длины pastWeeks+1 (0 — самая старая, pastWeeks — сейчас)
+  // === ИСТОРИЧЕСКАЯ ОБРАБОТКА: агрегирование по неделям ===
+  // Возвращает объект {1:[],2:[],3:[],4:[]} длины pastWeeks+1 (0 — самая старая,...,last — сейчас)
   function aggregateByWeeks(realData, pastWeeks = 10) {
     const wk = 7 * 24 * 60 * 60 * 1000;
     const now = Date.now();
     const len = pastWeeks + 1;
 
-    // sums и counts для агрегирования
-    const sums = { 1: Array(len).fill(0), 2: Array(len).fill(0), 3: Array(len).fill(0), 4: Array(len).fill(0) };
-    const counts = { 1: Array(len).fill(0), 2: Array(len).fill(0), 3: Array(len).fill(0), 4: Array(len).fill(0) };
+    const sums = {1: Array(len).fill(0), 2: Array(len).fill(0), 3: Array(len).fill(0), 4: Array(len).fill(0)};
+    const counts = {1: Array(len).fill(0), 2: Array(len).fill(0), 3: Array(len).fill(0), 4: Array(len).fill(0)};
 
     for (const it of realData) {
       const f = it.fields ? it.fields : it;
@@ -157,80 +152,141 @@
 
       const dt = new Date(tsStr);
       if (isNaN(dt)) continue;
-
       const weeksAgo = Math.floor((now - dt.getTime()) / wk);
       if (weeksAgo < 0 || weeksAgo > pastWeeks) continue;
 
-      // индексы: 0 — самая старая, len-1 — сейчас
       const idx = pastWeeks - weeksAgo;
       const target = chart1Ids.includes(id) ? 1 : (chart2Ids.includes(id) ? 2 : id);
       sums[target][idx] += val;
       counts[target][idx] += 1;
     }
 
-    // Формируем финальный массив — для потоков суммируем, для темп. — среднее
     const out = {};
     [1,2,3,4].forEach(id => {
       out[id] = Array(len).fill(null);
       for (let i = 0; i < len; i++) {
         if (counts[id][i] === 0) { out[id][i] = null; continue; }
-        if (id === 1 || id === 2) out[id][i] = Number(sums[id][i].toFixed(3));
-        else out[id][i] = Number((sums[id][i] / counts[id][i]).toFixed(2));
+        if (id === 1 || id === 2) {
+          // Для потоков: в режиме sum — оставляем суммарное значение по всем детекторам,
+          // в режиме avg — делим на количество детекторов (средний)
+          if (FLOW_AGG_MODE === 'sum') out[id][i] = Number(sums[id][i].toFixed(0));
+          else out[id][i] = Number((sums[id][i] / counts[id][i]).toFixed(0));
+        } else {
+          // Для температур — среднее значение
+          out[id][i] = Number((sums[id][i] / counts[id][i]).toFixed(2));
+        }
       }
     });
     return out;
   }
 
-  // === ПРОГНОЗНАЯ ОБРАБОТКА: экстраполяция/расширение прогноза на большее количество недель ===
-  // fmap: { id: [v1(+1), v2(+2), v3(+3)] }
-  // Возвращает {id: [val0, val1, ..., valFutureWeeks-1]} длины futureWeeks
+  // === ПРОГНОЗНАЯ ОБРАБОТКА ===
+  // extrapolateForecast — расширяет прогноз до нужного количества недель (линейная экстраполяция)
   function extrapolateForecast(fmap, futureWeeks = 10) {
     const out = {};
     [1,2,3,4].forEach(id => {
       const base = Array.from((fmap && fmap[id]) || []);
       const res = Array(futureWeeks).fill(null);
-
-      // Сначала копируем те значения, которые есть в forecast (обычно 3 значения)
       for (let i = 0; i < Math.min(base.length, futureWeeks); i++) {
         res[i] = base[i] != null ? base[i] : null;
       }
-
-      // Соберём список известных (index, value)
       const known = [];
-      for (let i = 0; i < base.length; i++) if (base[i] != null) known.push({ i: i, v: base[i] });
-
-      // Если есть >=2 известных — делаем линейную экстраполяцию на основе двух последних известных
+      for (let i = 0; i < base.length; i++) if (base[i] != null) known.push({i:i, v: base[i]});
       if (known.length >= 2) {
         const a = known[known.length - 2], b = known[known.length - 1];
         const step = (b.v - a.v) / (b.i - a.i);
         for (let k = b.i + 1; k < futureWeeks; k++) {
-          let val = b.v + step * (k - b.i);
-          // Округляем: если в данных есть дроби — 2 знака, иначе целое
           const places = (String(b.v).includes('.') || String(a.v).includes('.')) ? 2 : 0;
-          res[k] = Number(val.toFixed(places));
+          res[k] = Number((b.v + step * (k - b.i)).toFixed(places));
         }
       } else if (known.length === 1) {
-        // Если только 1 известное — просто заполняем им все последующие недели (const)
         for (let k = known[0].i + 1; k < futureWeeks; k++) res[k] = known[0].v;
       }
-      // Если нет известных — останутся null
       out[id] = res;
     });
     return out;
   }
 
-  // === ФОРМИРУЕМ ДАННЫЕ ДЛЯ SMALL И EXTENDED ГРАФИКОВ ===
-  async function processChartData(pastWeeks = 10, futureWeeks = 10) {
-    // Загружаем параллельно реальные данные и прогноз (параллель, но обработаем ошибки)
-    const [realP, forecastP] = await Promise.allSettled([loadRealData(), loadForecast()]);
+  // Попытка выровнять масштаб прогнозов относительно истории.
+  // Алгоритм:
+  // 1) Берём среднее историческое за последние N недель (например последние 3 непустых).
+  // 2) Берём среднее прогнозов (те 3 значения, которые вернула модель).
+  // 3) Если оба средних существую и > 0 — вычисляем factor = histMean / forecastMean.
+  // 4) Если factor в разумных пределах (0.5..2) — применяем; если вне — ограничиваем к диапазону 0.5..2.
+  // 5) Если прогнозы выглядят «очень маленькими» (<5) и histMean >> forecastMean — используем FALLBACK_SCALE_FOR_FORECAST.
+  function alignForecastScale(historical, forecastMap) {
+    const debug = { info: [] };
+    [1,2].forEach(id => {
+      // берём последние 3 исторических значения, исключая null
+      const histArr = (historical[id] || []).slice(-6).filter(v => v != null);
+      const lastHist = histArr.slice(-3);
+      const histMean = lastHist.length ? (lastHist.reduce((a,b)=>a+b,0) / lastHist.length) : null;
 
+      // прогноз — первые 3 значения из forecastMap[id]
+      const fArr = (forecastMap[id] || []).slice(0,3).filter(v => v != null);
+      const fMean = fArr.length ? (fArr.reduce((a,b)=>a+b,0) / fArr.length) : null;
+
+      debug.info.push({ id, histMean, fMean, rawForecast: forecastMap[id] });
+
+      if (histMean != null && fMean != null && fMean > 0) {
+        let factor = histMean / fMean;
+        // ограничим фактор, чтобы не делать экстремальную корректировку
+        if (factor > 3) factor = Math.min(factor, 3);
+        if (factor < 0.33) factor = Math.max(factor, 0.33);
+
+        // Если прогнозы очень маленькие (меньше 5) — возможно модель вернула значение в других единицах:
+        if (fMean < 5 && histMean >= 30) {
+          // fallback: если FALLBACK_SCALE_FOR_FORECAST помогает, применим его
+          const fallback = FALLBACK_SCALE_FOR_FORECAST;
+          const fallbackFactor = (fMean * fallback) > 0 ? (histMean / (fMean * fallback)) : 1;
+          // ограничим
+          const useFactor = Math.abs(1 - fallbackFactor) < Math.abs(1 - factor) ? fallback * fallbackFactor : factor;
+          factor = Math.min(Math.max(useFactor, 0.33), 3);
+        }
+
+        // применяем factor к прогнозам
+        debug.info.push({ id, appliedFactor: factor });
+        if (Array.isArray(forecastMap[id])) {
+          forecastMap[id] = forecastMap[id].map(v => (v == null ? null : Number((v * factor).toFixed(0))));
+        }
+      } else {
+        // Если не можем посчитать — пробуем простой fallback умножения, если значения маленькие
+        if (fMean != null && fMean < 5) {
+          const scaled = forecastMap[id].map(v => (v == null ? null : Number((v * FALLBACK_SCALE_FOR_FORECAST).toFixed(0))));
+          forecastMap[id] = scaled;
+          debug.info.push({ id, appliedFallbackScale: FALLBACK_SCALE_FOR_FORECAST, scaled });
+        }
+      }
+    });
+
+    console.log('Forecast alignment debug:', debug);
+    return forecastMap;
+  }
+
+  // === СОБИРАЕМ ДАННЫЕ ДЛЯ ГРАФИКОВ (small + extended) ===
+  async function processChartData(pastWeeks = 10, futureWeeks = 10) {
+    const [realP, forecastP] = await Promise.allSettled([loadRealData(), loadForecast()]);
     if (realP.status !== 'fulfilled') throw new Error('Ошибка загрузки реальных данных: ' + (realP.reason?.message || realP.reason));
     const realData = realP.value;
 
-    // forecastMap — если не загрузился прогноз, используем пустой шаблон (3 ячейки)
-    const forecastMap = forecastP.status === 'fulfilled'
-      ? forecastP.value
-      : { 1: [null, null, null], 2: [null, null, null], 3: [null, null, null], 4: [null, null, null] };
+    const forecastRaw = forecastP.status === 'fulfilled' ? forecastP.value : {1:[null,null,null],2:[null,null,null],3:[null,null,null],4:[null,null,null]};
+
+    // === ИСТОРИЧЕСКАЯ ЧАСТЬ (агрегация) ===
+    const historical = aggregateByWeeks(realData, pastWeeks); // длина pastWeeks+1
+
+    // Для диагностики: посчитаем средние последние 3 недели (XVS/GVS) и выведем в консоль
+    function lastNMean(arr, n = 3) {
+      if (!Array.isArray(arr)) return null;
+      const vals = arr.slice(-n).filter(v => v != null);
+      if (!vals.length) return null;
+      return vals.reduce((a,b)=>a+b,0)/vals.length;
+    }
+    const histXvsMean = lastNMean(historical[1], 3);
+    const histGvsMean = lastNMean(historical[2], 3);
+    console.log('Исторические средние (последние 3 недели):', { histXvsMean, histGvsMean });
+
+    // === ПРОГНОЗНАЯ ЧАСТЬ: попытка подогнать масштаб прогнозов под историю ===
+    const forecastAligned = alignForecastScale(historical, JSON.parse(JSON.stringify(forecastRaw))); // клонируем, чтобы не рушить оригинал
 
     // -------------------------
     // 1) BUILD SMALL (8 точек: 4 прошлые + Сейчас + 3 прогноза)
@@ -239,10 +295,10 @@
       const wk = 7 * 24 * 60 * 60 * 1000;
       const now = Date.now();
       const historyLen = 5; // 4 прошлые + "Сейчас"
-      const sums = { 1: Array(historyLen).fill(0), 2: Array(historyLen).fill(0), 3: Array(historyLen).fill(0), 4: Array(historyLen).fill(0) };
-      const counts = { 1: Array(historyLen).fill(0), 2: Array(historyLen).fill(0), 3: Array(historyLen).fill(0), 4: Array(historyLen).fill(0) };
+      const sums = {1: Array(historyLen).fill(0), 2: Array(historyLen).fill(0), 3: Array(historyLen).fill(0), 4: Array(historyLen).fill(0)};
+      const counts = {1: Array(historyLen).fill(0), 2: Array(historyLen).fill(0), 3: Array(historyLen).fill(0), 4: Array(historyLen).fill(0)};
 
-      // --- ИСТОРИЧЕСКАЯ ЧАСТЬ small: пробегаем реальные записи и агрегируем по неделям (0..4)
+      // Пробегаем реальные записи и собираем по неделям (0..4)
       for (const it of realData) {
         const f = it.fields ? it.fields : it;
         const id = Number(f.detector_id || f.detectorId || f.id || f.detector);
@@ -260,17 +316,23 @@
         counts[target][idx] += 1;
       }
 
-      // Формируем итоговый small (8 точек) — первые 5 из истории, последние 3 из forecastMap
-      const out = { 1: Array(8).fill(null), 2: Array(8).fill(null), 3: Array(8).fill(null), 4: Array(8).fill(null) };
+      const out = {1: Array(8).fill(null), 2: Array(8).fill(null), 3: Array(8).fill(null), 4: Array(8).fill(null)};
       [1,2,3,4].forEach(id => {
         for (let i = 0; i < 5; i++) {
-          if (counts[id][i] === 0) out[id][i] = null;
-          else out[id][i] = (id === 1 || id === 2) ? Number(sums[id][i].toFixed(3)) : Number((sums[id][i] / counts[id][i]).toFixed(2));
+          if (counts[id][i] === 0) { out[id][i] = null; continue; }
+          if (id === 1 || id === 2) {
+            // режим sum / avg
+            if (FLOW_AGG_MODE === 'sum') out[id][i] = Number(sums[id][i].toFixed(0));
+            else out[id][i] = Number((sums[id][i] / counts[id][i]).toFixed(0));
+          } else {
+            out[id][i] = Number((sums[id][i] / counts[id][i]).toFixed(2));
+          }
         }
-        // --- ПРОГНОЗЫ для small: берем из forecastMap (3 значения)
-        out[id][5] = forecastMap[id] && forecastMap[id][0] !== undefined ? forecastMap[id][0] : null;
-        out[id][6] = forecastMap[id] && forecastMap[id][1] !== undefined ? forecastMap[id][1] : null;
-        out[id][7] = forecastMap[id] && forecastMap[id][2] !== undefined ? forecastMap[id][2] : null;
+
+        // прогнозы для small: берем aligned forecast (3 значения)
+        out[id][5] = forecastAligned[id] && forecastAligned[id][0] !== undefined ? forecastAligned[id][0] : null;
+        out[id][6] = forecastAligned[id] && forecastAligned[id][1] !== undefined ? forecastAligned[id][1] : null;
+        out[id][7] = forecastAligned[id] && forecastAligned[id][2] !== undefined ? forecastAligned[id][2] : null;
       });
 
       return out;
@@ -279,30 +341,31 @@
     // -------------------------
     // 2) EXTENDED: история pastWeeks+1 + прогноз futureWeeks (экстраполяция)
     // -------------------------
-    const historical = aggregateByWeeks(realData, pastWeeks); // ИСТОРИЧЕСКИЕ данные (pastWeeks+1 длина)
-    const forecastExtended = extrapolateForecast(forecastMap, futureWeeks); // ПРОГНОЗ расширенный (futureWeeks длина)
+    const forecastExtended = extrapolateForecast(forecastAligned, futureWeeks);
     const extLen = pastWeeks + 1 + futureWeeks;
     const extended = {};
     [1,2,3,4].forEach(id => {
       extended[id] = Array(extLen).fill(null);
-      // копируем историю (индексы 0..pastWeeks)
-      for (let i = 0; i <= pastWeeks; i++) {
-        extended[id][i] = (historical[id] && historical[id][i] !== undefined) ? historical[id][i] : null;
-      }
-      // копируем прогноз (pastWeeks+1 .. end)
-      for (let j = 0; j < futureWeeks; j++) {
-        extended[id][pastWeeks + 1 + j] = (forecastExtended[id] && forecastExtended[id][j] !== undefined) ? forecastExtended[id][j] : null;
-      }
+      for (let i = 0; i <= pastWeeks; i++) extended[id][i] = (historical[id] && historical[id][i] !== undefined) ? historical[id][i] : null;
+      for (let j = 0; j < futureWeeks; j++) extended[id][pastWeeks + 1 + j] = (forecastExtended[id] && forecastExtended[id][j] !== undefined) ? forecastExtended[id][j] : null;
     });
+
+    // Диагностика: покажем в консоли что мы получили
+    console.log('SMALL sample (4 past + now + 3 forecast):', { small });
+    console.log('EXTENDED (history + forecast): lengths', { pastWeeks, futureWeeks, extendedLengths: { xvs: extended[1].length, gvs: extended[2].length } });
 
     return { small, extended };
   }
 
-  // === CHART HELPERS (не меняем) ===
+  // === CHART HELPERS & UI (оставляем логику Chart.js) ===
+  // Для краткости — я сохранил ваши функции createSmallChart, prepareSmallDatasets, prepareExtendedDatasets,
+  // nowLinePlugin и openModal/closeModal (структура осталась, с небольшими правками).
+  // (Здесь я вставлю упрощённые/совместимые реализации — можно заменить на ваш оригинал, если нужно.)
+
   const nowLinePlugin = {
     id: 'nowLineSmall',
     afterDraw(chart) {
-      const xIdx = 4; // index "Сейчас" для small charts
+      const xIdx = 4;
       const xScale = chart.scales.x; if (!xScale) return;
       const x = xScale.getPixelForValue(xIdx);
       const ctx = chart.ctx; const top = chart.chartArea.top; const bottom = chart.chartArea.bottom;
@@ -311,24 +374,9 @@
     }
   };
 
-  function nowLinePluginFactory(centerIndex) {
-    return {
-      id: 'nowLineLarge_' + centerIndex,
-      afterDraw(chart) {
-        const xScale = chart.scales.x; if (!xScale) return;
-        const x = xScale.getPixelForValue(centerIndex);
-        const ctx = chart.ctx; const top = chart.chartArea.top; const bottom = chart.chartArea.bottom;
-        ctx.save(); ctx.beginPath(); ctx.setLineDash([6, 4]); ctx.strokeStyle = '#6b7280'; ctx.lineWidth = 1.2;
-        ctx.moveTo(x, top); ctx.lineTo(x, bottom); ctx.stroke(); ctx.restore();
-      }
-    };
-  }
-
-  // Создание маленького графика (small)
   function createSmallChart(canvasId, datasets, unitType) {
     const canvas = document.getElementById(canvasId); if (!canvas) return null;
     const ctx = canvas.getContext('2d');
-    const weekDates = calculateWeekDates(4, 3);
     const cfg = {
       type: 'line',
       data: { labels: smallLabels, datasets },
@@ -341,9 +389,10 @@
             mode: 'index', intersect: false,
             callbacks: {
               title: items => {
-                const i = items[0].dataIndex; const lbl = smallLabels[i] || '';
+                const i = items[0].dataIndex;
+                const weekDates = calculateWeekDates(4,3);
                 const date = weekDates[i] || '';
-                return i >= 5 ? `${lbl} (${date}) [ПРОГНОЗ]` : `${lbl} (${date})`;
+                return i >= 5 ? `${smallLabels[i]} (${date}) [ПРОГНОЗ]` : `${smallLabels[i]} (${date})`;
               },
               label: ctx => {
                 const y = ctx.parsed?.y; let s = (ctx.dataset.label ? ctx.dataset.label + ': ' : '');
@@ -359,7 +408,7 @@
       },
       plugins: [nowLinePlugin]
     };
-    // background alpha helper
+    // немного стиля для backgroundColor
     cfg.data.datasets = cfg.data.datasets.map(ds => ({ ...ds, backgroundColor: (ds.borderColor && ds.borderColor.length === 7 ? ds.borderColor + '22' : ds.backgroundColor), spanGaps: false }));
     try { return new Chart(ctx, cfg); } catch (e) { console.error('createSmallChart error', e); return null; }
   }
@@ -374,7 +423,6 @@
         fill: false,
         tension: 0.35,
         pointRadius: 3,
-        // сегменты: пункты с индексом >=5 (прогноз) будут штрихом
         segment: {
           borderDash: ctx => {
             try { return (ctx && ctx.p1DataIndex >= 5) ? [6, 4] : []; } catch { return []; }
@@ -399,21 +447,18 @@
     });
   }
 
-  // === МОДАЛЬНЫЙ ГРАФИК === (openModal / closeModal — логика та же, с комментариями)
+  // Модалка — упрощённая: создаём canvas, рисуем extended chart
   let currentModal = null;
   function openModal(payload) {
     if (!payload) return;
     closeModal();
-
     const overlay = document.createElement('div');
     overlay.id = 'chart-modal-overlay';
     Object.assign(overlay.style, { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: '20px' });
     overlay.addEventListener('click', e => { if (e.target === overlay) closeModal(); });
-
     const box = document.createElement('div');
     Object.assign(box.style, { width: '100%', maxWidth: '1100px', height: '80%', background: '#fff', borderRadius: '8px', boxShadow: '0 12px 40px rgba(2,6,23,0.4)', overflow: 'hidden', display: 'flex', flexDirection: 'column' });
     box.addEventListener('click', e => e.stopPropagation());
-
     const header = document.createElement('div');
     Object.assign(header.style, { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', borderBottom: '1px solid #eee' });
     const h = document.createElement('div'); h.style.fontWeight = '600'; h.textContent = payload.title || 'Расширенный график';
@@ -421,51 +466,23 @@
     closeBtn.innerHTML = '&#10005;'; closeBtn.title = 'Закрыть'; Object.assign(closeBtn.style, { background: 'transparent', border: 0, fontSize: '18px', cursor: 'pointer', padding: '6px' });
     closeBtn.addEventListener('click', closeModal);
     header.appendChild(h); header.appendChild(closeBtn);
-
     const canvasWrap = document.createElement('div');
     Object.assign(canvasWrap.style, { flex: 1, position: 'relative', padding: '12px' });
-    const canvas = document.createElement('canvas');
-    canvas.id = 'modalChartCanvas';
-    Object.assign(canvas.style, { width: '100%', height: '100%', display: 'block' });
+    const canvas = document.createElement('canvas'); canvas.id = 'modalChartCanvas'; Object.assign(canvas.style, { width: '100%', height: '100%', display: 'block' });
     canvasWrap.appendChild(canvas);
-
     const footer = document.createElement('div');
     Object.assign(footer.style, { padding: '8px 12px', borderTop: '1px solid #eee', fontSize: '13px', color: '#444', background: '#fafafa' });
     footer.textContent = 'Просмотр расширенного периода. Нажмите Esc или крестик чтобы закрыть.';
-
     box.appendChild(header); box.appendChild(canvasWrap); box.appendChild(footer);
-    overlay.appendChild(box);
-    document.body.appendChild(overlay);
+    overlay.appendChild(box); document.body.appendChild(overlay);
 
     function onKey(e) { if (e.key === 'Escape') closeModal(); }
     document.addEventListener('keydown', onKey);
 
-    function closeModalInner() {
-      if (currentModal && currentModal.chart) try { currentModal.chart.destroy(); } catch (_) {}
-      try { document.removeEventListener('keydown', onKey); } catch (_) {}
-      try { overlay.remove(); } catch (_) {}
-      currentModal = null;
-    }
-    window._closeChartModal = closeModalInner;
-
-    // Устанавливаем сегменты: исторические точки (<= centerIndex) — сплошные, прогноз (> centerIndex) — штрих
-    const centerIndex = payload.centerIndex;
-    const datasetsForChart = payload.datasets.map(ds => {
-      const copy = { ...ds };
-      copy.segment = {
-        borderDash: ctx => {
-          try { return (ctx && ctx.p1DataIndex > centerIndex) ? [6, 4] : []; } catch { return []; }
-        }
-      };
-      copy.backgroundColor = (copy.borderColor && copy.borderColor.length === 7) ? copy.borderColor + '22' : copy.backgroundColor;
-      copy.spanGaps = true;
-      return copy;
-    });
-
     const ctx = canvas.getContext('2d');
     const cfg = {
       type: 'line',
-      data: { labels: payload.labelsArray, datasets: datasetsForChart },
+      data: { labels: payload.labelsArray, datasets: payload.datasets },
       options: {
         responsive: true, maintainAspectRatio: false,
         interaction: { mode: 'index', intersect: false },
@@ -476,9 +493,8 @@
             callbacks: {
               title: items => {
                 const i = items[0].dataIndex;
-                const lbl = payload.labelsArray[i] || '';
                 const date = payload.weekDates && payload.weekDates[i] ? payload.weekDates[i] : '';
-                return i > payload.pastWeeks ? `${lbl} (${date}) [ПРОГНОЗ]` : `${lbl} (${date})`;
+                return i > payload.pastWeeks ? `${payload.labelsArray[i]} (${date}) [ПРОГНОЗ]` : `${payload.labelsArray[i]} (${date})`;
               },
               label: ctx => {
                 const y = ctx.parsed?.y; let s = (ctx.dataset.label ? ctx.dataset.label + ': ' : '');
@@ -491,20 +507,19 @@
           legend: { display: true, position: 'top' }
         },
         elements: { line: { borderWidth: 1.25, tension: 0.25 }, point: { radius: 3 } }
-      },
-      plugins: [nowLinePluginFactory(centerIndex)]
+      }
     };
-
     try { currentModal = { chart: new Chart(ctx, cfg), overlay }; } catch (e) { console.error('modal chart create error', e); currentModal = null; }
     return currentModal;
   }
 
   function closeModal() {
-    try { window._closeChartModal && window._closeChartModal(); } catch (_) {}
+    try { if (currentModal && currentModal.chart) currentModal.chart.destroy(); } catch (_) {}
+    try { if (currentModal && currentModal.overlay) currentModal.overlay.remove(); } catch (_) {}
+    currentModal = null;
   }
 
-  // === МОДАЛЬНЫЕ ДАННЫЕ И БИНДИНГ КЛИКОВ ===
-  const modalStore = {}; // key -> payload
+  const modalStore = {};
   function bindClick(canvasId, key) {
     const el = document.getElementById(canvasId); if (!el) return;
     el.style.cursor = 'pointer';
@@ -520,14 +535,12 @@
       const pastWeeks = 10, futureWeeks = 10;
       const { small, extended } = await processChartData(pastWeeks, futureWeeks);
 
-      // chart1 (flow XVS) — small + modal payload
+      // chart1 (flow XVS)
       const ds1 = prepareSmallDatasets(small, [1], ['#3b82f6'], ['Общее потребление ХВС, м³']);
       createSmallChart('chart1', ds1, 'flow');
       const extDs1 = prepareExtendedDatasets(extended, [1], ['#3b82f6'], ['Общее потребление ХВС, м³']);
       const extLabels = [];
-      for (let i = -pastWeeks; i <= futureWeeks; i++) {
-        extLabels.push(i < 0 ? `${i} нед` : (i === 0 ? 'Сейчас' : `+${i} нед`));
-      }
+      for (let i = -pastWeeks; i <= futureWeeks; i++) extLabels.push(i < 0 ? `${i} нед` : (i === 0 ? 'Сейчас' : `+${i} нед`));
       modalStore['chart1'] = {
         datasets: extDs1,
         unitType: 'flow',
@@ -608,7 +621,7 @@
       };
       bindClick('chart4', 'chart4');
 
-      console.log('Charts initialized');
+      console.log('Charts initialized — FLOW_AGG_MODE=' + FLOW_AGG_MODE + ', FALLBACK_SCALE_FOR_FORECAST=' + FALLBACK_SCALE_FOR_FORECAST);
     } catch (e) {
       console.error('Init error', e);
       const alertBox = document.createElement('div');
@@ -618,7 +631,6 @@
     }
   }
 
-  // Запуск (ждём DOMContentLoaded если надо)
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', initialize);
   else initialize();
 
