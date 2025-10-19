@@ -207,6 +207,12 @@
     color: #4b5563;
 }
 
+.date-m,
+.accuracy-m,
+.improvement-m {
+    font-size: 12px;
+}
+
 .title-risk {
     font-size: 14px;
     line-height: 143%;
@@ -695,3 +701,4 @@ input[type="range"]::-ms-thumb {
     opacity: 0;
     pointer-events: none;
 }
+
