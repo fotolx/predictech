@@ -695,10 +695,3 @@ input[type="range"]::-ms-thumb {
     opacity: 0;
     pointer-events: none;
 }
-
-.last-training-label, .last-training-date, .model-accuracy-label, .model-accuracy-value, .accuracy-improvement-label, .accuracy-improvement-value .date-m,
-.last-training-label, .last-training-date, .model-accuracy-label, .model-accuracy-value, .accuracy-improvement-label, .accuracy-improvement-value .accuracy-m,
-.last-training-label, .last-training-date, .model-accuracy-label, .model-accuracy-value, .accuracy-improvement-label, .accuracy-improvement-value .improvement-m {
-    font-size:12px
-}
-
