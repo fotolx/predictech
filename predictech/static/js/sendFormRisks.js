@@ -1,267 +1,254 @@
-(function () {
-    'use strict';
-
-    const RISK_URL = 'https://predictech.5d4.ru/risks';
-    const PROXIES = [
-        'https://api.codetabs.com/v1/proxy?quest=',
-        'https://corsproxy.io/?',
-        'https://cors-anywhere.herokuapp.com/',
-        'https://thingproxy.freeboard.io/fetch/'
+/**
+ * RiskSettingsLoader
+ * Авто-заполнение формы /risks/ значениями с https://predictech.5d4.ru/risks
+ */
+class RiskSettingsLoader {
+  constructor(opts = {}) {
+    this.url = opts.url || 'https://predictech.5d4.ru/risks';
+    this.formSelector = opts.formSelector || 'form.risk-settings.form-update';
+    this.requiredNames = ['xvs','gvs','cold_water_supply','reverse_flow','t1','t2','sensivity'];
+    this.maxWaitMs = opts.maxWaitMs || 20000; // сколько ждать появления формы (ms)
+    this.pollInterval = opts.pollInterval || 400; // интервал опроса (ms)
+    this.proxies = [
+      'https://cors-anywhere.herokuapp.com/',
+      'https://api.codetabs.com/v1/proxy?quest=',
+      'https://corsproxy.io/?',
+      'https://cors.bridged.cc/'
     ];
-    const POLL_INTERVAL = 700; // ms для опроса наличия формы если MutationObserver не срабатывает
-    const FETCH_TIMEOUT = 8000; // ms
+    this.init();
+  }
 
-    console.log('RiskFormAutoFill: инициализация...');
-
-    // --- Утилиты ---
-    function safeJsonParse(text) {
-        let cleaned = (text || '').trim();
-        if (!cleaned) throw new Error('Пустой ответ');
-        // Попробуем сразу JSON.parse
-        try {
-            return JSON.parse(cleaned);
-        } catch (e) {
-            // Пытаемся вытащить JSON-подстроку
-            const jsonMatch = cleaned.match(/(\{[\s\S]*\}|\[[\s\S]*\])/);
-            if (jsonMatch) {
-                try { return JSON.parse(jsonMatch[0]); } catch (e2) {}
-            }
-            // Попробуем заменить одинарные кавычки на двойные и ключи без кавычек
-            try {
-                let attempt = cleaned.replace(/'/g, '"').replace(/(\w+)\s*:/g, '"$1":');
-                return JSON.parse(attempt);
-            } catch (e3) {
-                // в крайнем случае — попытка eval (опасно, но делаем как последний шанс в контролируемом окружении)
-                try {
-                    // eslint-disable-next-line no-eval
-                    const res = eval(`(${cleaned})`);
-                    return res;
-                } catch (e4) {
-                    throw new Error('Не удалось распарсить ответ как JSON');
-                }
-            }
-        }
-    }
-
-    function withTimeout(promise, ms) {
-        return Promise.race([
-            promise,
-            new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), ms))
-        ]);
-    }
-
-    async function tryFetch(url, options = {}) {
-        const resp = await withTimeout(fetch(url, options), FETCH_TIMEOUT);
-        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-        return await resp.text();
-    }
-
-    async function fetchWithFallback(url) {
-        console.log('RiskFormAutoFill: пытаемся получить данные напрямую...');
-        try {
-            // основной запрос с режимом CORS (обычно нужно), но если сайт не разрешает — упадёт
-            const text = await tryFetch(url, { method: 'GET', mode: 'cors' });
-            console.log('RiskFormAutoFill: прямой fetch успешен');
-            return text;
-        } catch (err) {
-            console.warn('RiskFormAutoFill: прямой fetch не сработал:', err.message);
-        }
-
-        // Перебираем прокси
-        for (const proxy of PROXIES) {
-            const proxUrl = proxy + url;
-            try {
-                console.log(`RiskFormAutoFill: пробуем прокси ${proxy}...`);
-                const txt = await tryFetch(proxUrl, { method: 'GET' });
-                console.log(`RiskFormAutoFill: прокси ${proxy} вернул ответ`);
-                return txt;
-            } catch (e) {
-                console.warn(`RiskFormAutoFill: прокси ${proxy} не сработал:`, e.message);
-                continue;
-            }
-        }
-
-        throw new Error('Все варианты загрузки данных не сработали');
-    }
-
-    // Сеттер, который вызывает input/change события чтобы остальные слушатели увидели изменение
-    function setValueAndEmit(el, value) {
-        try {
-            if (!el) return;
-            // для полей number/range нужно присвоить строковое значение
-            el.value = (value === null || value === undefined) ? '' : String(value);
-            // aria обновления (для range)
-            if (el.getAttribute && el.getAttribute('aria-valuenow') !== null) {
-                el.setAttribute('aria-valuenow', el.value);
-            }
-            el.dispatchEvent(new Event('input', { bubbles: true }));
-            el.dispatchEvent(new Event('change', { bubbles: true }));
-        } catch (e) {
-            console.warn('RiskFormAutoFill: ошибка установки значения', e);
-        }
-    }
-
-    function applyDataToForm(formEl, dataObj) {
-        if (!formEl || !dataObj) {
-            console.warn('RiskFormAutoFill: форма или данные отсутствуют');
-            return;
-        }
-        console.log('RiskFormAutoFill: применяем данные к форме:', dataObj);
-
-        const fieldNames = ['xvs', 'gvs', 'cold_water_supply', 'reverse_flow', 't1', 't2', 'sensivity'];
-        fieldNames.forEach(name => {
-            const input = formEl.querySelector(`[name="${name}"]`);
-            if (input) {
-                const val = dataObj[name] ?? dataObj[name.toLowerCase()] ?? dataObj[name.toUpperCase()] ?? '';
-                setValueAndEmit(input, val);
-                console.log(`RiskFormAutoFill: установлен ${name} = ${val}`);
-            } else {
-                // если не найдено по имени, попробуем найти по id или class (резерв)
-                const fallback = formEl.querySelector(`#${name}, .${name}`);
-                if (fallback) {
-                    const val = dataObj[name] ?? '';
-                    setValueAndEmit(fallback, val);
-                    console.log(`RiskFormAutoFill: установлен (fallback) ${name} = ${val}`);
-                } else {
-                    console.log(`RiskFormAutoFill: поле ${name} не найдено в форме`);
-                }
-            }
-        });
-
-        // Особая обработка слайдера чувствительности: обновляем видимый span с id sensitivity-value
-        const sensInput = formEl.querySelector('[name="sensivity"], #sensitivity');
-        const sensSpan = formEl.querySelector('#sensitivity-value');
-        if (sensInput && sensSpan) {
-            const displayed = sensInput.value || sensInput.getAttribute('value') || '1';
-            sensSpan.textContent = displayed;
-            sensInput.setAttribute('aria-valuenow', String(displayed));
-            // Обновим события на слайдере
-            sensInput.dispatchEvent(new Event('input', { bubbles: true }));
-            console.log(`RiskFormAutoFill: обновлен слайдер sensivity -> ${displayed}`);
-        }
-    }
-
-    // Попытка привести полученные данные к объекту с нужными ключами
-    function normalizeData(raw) {
-        // raw может быть объектом, массивом, или иным
-        if (!raw) return null;
-
-        // Если массив — возможно нужный объект в первом элементе
-        if (Array.isArray(raw)) {
-            // ищем объект, который содержит хоть одно нужное поле
-            const candidate = raw.find(item => item && typeof item === 'object' &&
-                ( 'xvs' in item || 'gvs' in item || 'cold_water_supply' in item || 'sensivity' in item ));
-            if (candidate) return candidate;
-            return raw[0] && typeof raw[0] === 'object' ? raw[0] : null;
-        }
-
-        if (typeof raw === 'object') {
-            // если данные вложены
-            if (raw.data && typeof raw.data === 'object') return raw.data;
-            if (raw.results && typeof raw.results === 'object') return raw.results;
-            return raw;
-        }
-
-        // если строка — уже обработано до этого, но на всякий случай
-        return null;
-    }
-
-    // --- Основной рабочий цикл: загрузить данные и применить ---
-    async function loadAndApply(formEl) {
-        console.log('RiskFormAutoFill: loadAndApply вызван для формы:', formEl);
-        try {
-            const text = await fetchWithFallback(RISK_URL);
-            console.log('RiskFormAutoFill: получен ответ (первые 400 символов):', text.slice(0, 400));
-            const parsed = safeJsonParse(text);
-            const normalized = normalizeData(parsed);
-            if (!normalized) {
-                console.warn('RiskFormAutoFill: не удалось подготовить объект данных из ответа', parsed);
-                return;
-            }
-            // Попробуем привести ключи к простому виду (lowercase)
-            const dataObj = {};
-            for (const k of Object.keys(normalized)) {
-                dataObj[String(k).toLowerCase()] = normalized[k];
-            }
-            // Иногда поле может называться sensivity или sensitivity - поддержим оба
-            if (!('sensivity' in dataObj) && ('sensitivity' in dataObj)) dataObj['sensivity'] = dataObj['sensitivity'];
-
-            // Лог всех ключей для отладки
-            console.log('RiskFormAutoFill: подготовленный объект данных (ключи):', Object.keys(dataObj));
-            applyDataToForm(formEl, dataObj);
-            console.log('RiskFormAutoFill: заполнение завершено.');
-        } catch (err) {
-            console.error('RiskFormAutoFill: ошибка loadAndApply:', err.message);
-        }
-    }
-
-    // --- Нахождение формы и подписка на её появление ---
-    function handleFoundForm(formEl) {
-        if (!formEl) return;
-        // Если уже засел на этой форме метка — не будем создавать лишние обработчики
-        if (formEl.dataset.riskAutofillApplied === 'true') {
-            // но всё равно попытаемся загрузить данные снова (на случай обновлений)
-            console.log('RiskFormAutoFill: найдено уже обработанное выражение формы — повторяем загрузку данных.');
-            loadAndApply(formEl);
-            return;
-        }
-        formEl.dataset.riskAutofillApplied = 'true';
-        console.log('RiskFormAutoFill: форма найдена, запускаем загрузку данных...');
-        loadAndApply(formEl);
-
-        // Если форма может переоткрываться и вы хотите, чтобы при каждом открытии заново применялись данные,
-        // можно отслеживать события появления модального окна и вызывать loadAndApply снова.
-        // Подключим MutationObserver к самой форме, чтобы реагировать на переполнения/перерисовки inputов.
-        const mo = new MutationObserver((mutations) => {
-            // При любых изменениях — пробуем применить данные ещё раз (например, когда inputs пересоздаются)
-            for (const m of mutations) {
-                if (m.type === 'childList' || m.type === 'attributes') {
-                    console.log('RiskFormAutoFill: изменение внутри формы, повторно применяем данные');
-                    loadAndApply(formEl);
-                    break;
-                }
-            }
-        });
-        mo.observe(formEl, { childList: true, subtree: true, attributes: true });
-    }
-
-    function startWatching() {
-        // Сначала попробуем немедленно найти форму
-        let form = document.querySelector('form.risk-settings.form-update, form.risk-settings');
-        if (form) {
-            handleFoundForm(form);
-        }
-
-        // MutationObserver для появления формы в DOM (динамическая вставка)
-        const bodyObserver = new MutationObserver((mutations, observer) => {
-            const f = document.querySelector('form.risk-settings.form-update, form.risk-settings');
-            if (f) {
-                console.log('RiskFormAutoFill: форма появилась в DOM (через MutationObserver)');
-                handleFoundForm(f);
-                // не отключаем observer — на будущее оставим следить за новыми появлениями формы
-            }
-        });
-        bodyObserver.observe(document.documentElement || document.body, { childList: true, subtree: true });
-
-        // Дополнительный polling (на случай, если MutationObserver не ловит)
-        setInterval(() => {
-            const f = document.querySelector('form.risk-settings.form-update, form.risk-settings');
-            if (f && f.dataset.riskAutofillApplied !== 'true') {
-                console.log('RiskFormAutoFill: форма найдена через poller');
-                handleFoundForm(f);
-            }
-        }, POLL_INTERVAL);
-    }
-
-    // init: дождёмся DOMContentLoaded или выполнится сразу если уже готов
+  init() {
     if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', () => {
-            console.log('RiskFormAutoFill: DOMContentLoaded — старт наблюдения...');
-            startWatching();
-        });
+      document.addEventListener('DOMContentLoaded', () => this.start());
     } else {
-        console.log('RiskFormAutoFill: DOM уже готов — старт наблюдения...');
-        startWatching();
+      // уже загружено
+      this.start();
+    }
+  }
+
+  async start() {
+    try {
+      const form = await this.waitForForm();
+      if (!form) {
+        console.warn('RiskSettingsLoader: форма не появилась в DOM в отведённое время');
+        return;
+      }
+      const raw = await this.loadDataWithFallback();
+      const parsed = this.processServerData(raw);
+      const chosen = this.pickBestRecord(parsed);
+      console.log('RiskSettingsLoader: Полученные данные (полный объект):', parsed);
+      console.log('RiskSettingsLoader: Выбран для заполнения:', chosen);
+
+      this.fillForm(form, chosen);
+      console.info('RiskSettingsLoader: Заполнение формы завершено.');
+    } catch (err) {
+      console.error('RiskSettingsLoader: Ошибка:', err);
+    }
+  }
+
+  waitForForm() {
+    // Возвращает Promise, который разрешается, когда форма появляется в DOM или истекает таймаут
+    return new Promise((resolve) => {
+      const start = Date.now();
+
+      const check = () => {
+        const el = document.querySelector(this.formSelector);
+        if (el) return resolve(el);
+        if (Date.now() - start > this.maxWaitMs) return resolve(null);
+        setTimeout(check, this.pollInterval);
+      };
+      check();
+
+      // Дополнительно, на всякий случай наблюдаем за вставкой элементов (если желательно — можно убрать)
+      const mo = new MutationObserver(() => {
+        const el = document.querySelector(this.formSelector);
+        if (el) {
+          mo.disconnect();
+          resolve(el);
+        }
+      });
+      mo.observe(document.documentElement, { childList: true, subtree: true });
+    });
+  }
+
+  async loadDataWithFallback() {
+    // Пытаемся fetch напрямую, если не работает — пробуем прокси по очереди
+    try {
+      const res = await fetch(this.url, { method: 'GET', cache: 'no-cache' });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      // Попробуем json() сначала
+      try {
+        const json = await res.json();
+        return json;
+      } catch (e) {
+        // если не JSON (или мутный), вернём текст для парсинга
+        const txt = await res.text();
+        return txt;
+      }
+    } catch (err) {
+      console.warn('RiskSettingsLoader: Прямая загрузка не сработала:', err.message);
+      // пробуем прокси по очереди
+      for (const proxy of this.proxies) {
+        try {
+          const proxyUrl = proxy + this.url;
+          console.info('RiskSettingsLoader: попытка через proxy:', proxy);
+          const res = await fetch(proxyUrl, { method: 'GET' });
+          if (!res.ok) throw new Error(`Proxy HTTP ${res.status}`);
+          try {
+            const json = await res.json();
+            return json;
+          } catch (e) {
+            const txt = await res.text();
+            return txt;
+          }
+        } catch (errProxy) {
+          console.warn(`RiskSettingsLoader: Proxy ${proxy} не сработал:`, errProxy.message);
+          // дальше пробуем следующий прокси
+          await this.sleep(400); // небольшая пауза, чтобы не "флудить"
+        }
+      }
+      throw new Error('RiskSettingsLoader: Не удалось загрузить данные (все варианты провалились)');
+    }
+  }
+
+  processServerData(raw) {
+    // Если raw уже объект/массив — возвращаем как есть
+    if (raw === null || raw === undefined) throw new Error('Пустой ответ сервера');
+    if (typeof raw === 'object') return raw;
+
+    // raw = строка -> попробуем распарсить в JSON разными способами
+    let text = String(raw).trim();
+
+    // Если на странице прилетел JSONP или есть лишние символы — извлечём JSON-подстроку
+    const jsonMatch = text.match(/\{[\s\S]*\}|\[[\s\S]*\]/);
+    if (jsonMatch) {
+      text = jsonMatch[0];
     }
 
-})();
+    // Пробуем стандартный JSON.parse
+    try {
+      return JSON.parse(text);
+    } catch (e1) {
+      // Альтернативный подход: заменить одиночные кавычки на двойные и попытаться
+      try {
+        const t2 = text.replace(/'/g, '"').replace(/(\w+)\s*:/g, '"$1":');
+        return JSON.parse(t2);
+      } catch (e2) {
+        // Наконец: если ничего не помогло — бросаем понятную ошибку
+        throw new Error('Не удалось распарсить текст ответа сервера как JSON');
+      }
+    }
+  }
+
+  pickBestRecord(parsed) {
+    // сервер может вернуть массив или объект. Нам нужен объект с ключами, соответствующими полям.
+    const keys = this.requiredNames;
+    if (Array.isArray(parsed)) {
+      // Найдём первый элемент массива, который содержит хотя бы одно требуемое поле
+      for (const item of parsed) {
+        if (item && typeof item === 'object') {
+          for (const k of keys) {
+            if (Object.prototype.hasOwnProperty.call(item, k)) return item;
+          }
+        }
+      }
+      // иначе вернём первый объект массива
+      return parsed[0];
+    } else if (parsed && typeof parsed === 'object') {
+      // Иногда данные вложены (например { data: {...} } или { results: [...] })
+      if (parsed.data && typeof parsed.data === 'object') return parsed.data;
+      if (parsed.results && Array.isArray(parsed.results) && parsed.results.length) {
+        return parsed.results[0];
+      }
+      // если объект сам содержит поля - возвращаем его
+      return parsed;
+    } else {
+      throw new Error('Формат ответа непонятен');
+    }
+  }
+
+  fillForm(form, dataObj) {
+    if (!form || !dataObj) return;
+    const listForConsole = [];
+
+    this.requiredNames.forEach((name) => {
+      const input = form.querySelector(`[name="${name}"]`);
+      // иногда имя в dataObj может быть с другим регистром или с подчеркиваниями/без
+      const value = this.findValueByName(dataObj, name);
+
+      if (input) {
+        try {
+          // если это <input type="range"> или number - присваиваем value
+          input.value = (value !== undefined && value !== null) ? String(value) : input.value;
+          // Обновим aria-атрибуты если есть
+          if (input.hasAttribute('aria-valuenow')) {
+            input.setAttribute('aria-valuenow', input.value);
+          }
+          // триггерим события input/change чтобы другие обработчики реагировали
+          input.dispatchEvent(new Event('input', { bubbles: true }));
+          input.dispatchEvent(new Event('change', { bubbles: true }));
+        } catch (e) {
+          console.warn(`RiskSettingsLoader: не удалось установить значение для ${name}`, e);
+        }
+      } else {
+        // Поля может не быть (например имя sensivity вместо sensitivity) — просто игнорируем
+      }
+
+      listForConsole.push({ name, value: value === undefined ? null : value });
+    });
+
+    // Дополнительно — обновим видимый спан с id="sensitivity-value", если он есть
+    const sensSpan = document.getElementById('sensitivity-value');
+    const sensInput = form.querySelector('[name="sensivity"], #sensitivity, input[type="range"][name="sensivity"]');
+
+    if (sensInput) {
+      const v = sensInput.value || this.findValueByName(dataObj, 'sensivity') || sensInput.getAttribute('value') || sensInput.defaultValue;
+      // форматируем до 1 знака после запятой (1.0) — в тексте используем запятую, если предпочитаете точку — замените
+      const formatted = (Number.isFinite(+v)) ? (+v).toFixed(1).replace('.', ',') : String(v);
+      if (sensSpan) sensSpan.textContent = formatted.replace(',', '.'); // оставим точку чтобы совпадало с исходным span вида "1" / "1.2"
+      // обновим aria
+      if (sensInput.hasAttribute('aria-valuenow')) sensInput.setAttribute('aria-valuenow', String(v));
+      // триггерим input
+      sensInput.dispatchEvent(new Event('input', { bubbles: true }));
+      sensInput.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+
+    // Выводим (короткий) список полученных данных в консоль, как просили
+    console.log('RiskSettingsLoader: Список значений для формы:', listForConsole);
+  }
+
+  findValueByName(obj, name) {
+    // Простая гибкая функция поиска значения по имени: ищет точное совпадение, либо вариант с другими регистрами, либо схожие ключи
+    if (!obj || typeof obj !== 'object') return undefined;
+    if (Object.prototype.hasOwnProperty.call(obj, name)) return obj[name];
+
+    const lower = name.toLowerCase();
+    for (const k of Object.keys(obj)) {
+      if (k.toLowerCase() === lower) return obj[k];
+    }
+
+    // также пробуем искать варианты без подчеркиваний/с дефисами
+    const norm = (s) => String(s).replace(/[_-]/g, '').toLowerCase();
+    for (const k of Object.keys(obj)) {
+      if (norm(k) === norm(name)) return obj[k];
+    }
+
+    // если значение вложено, пробуем пройтись по первым уровням
+    for (const k of Object.keys(obj)) {
+      const val = obj[k];
+      if (val && typeof val === 'object') {
+        const found = this.findValueByName(val, name);
+        if (found !== undefined) return found;
+      }
+    }
+
+    return undefined;
+  }
+
+  sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+}
+
+// Инициализация
+// Если нужно настроить параметры — передайте объект: new RiskSettingsLoader({ url: '...', formSelector: '...' })
+new RiskSettingsLoader();
